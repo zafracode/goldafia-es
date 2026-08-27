@@ -8,10 +8,20 @@
     <meta name="theme-color" content="#0a0a0a">
     <title>Gold Afiações | Premium</title>
 
-    <!-- Google Fonts: Plus Jakarta Sans para um visual moderno e corporativo -->
+    <link rel="manifest" href="manifest.json">
+    <!-- Também é bom chamar o ico direto no html para os navegadores de PC -->
+    <link rel="shortcut icon" href="ico.ico" type="image/x-icon">
+
+    <!-- Google Fonts: Plus Jakarta Sans -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Phosphor Icons: Ícones profissionais -->
+    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Chart.js para o Faturamento -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Biblioteca de Confetes -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Biblioteca para gerar PDF (html2pdf) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         /* =========================================
@@ -60,10 +70,22 @@
             overflow-x: hidden;
         }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: var(--bg-base); }
         ::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 10px; }
+
+        /* =========================================
+           ANIMAÇÕES DE PROFUNDIDADE (BACKGROUND SCALE)
+        ========================================= */
+        header, main, nav {
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            will-change: transform, opacity;
+        }
+        .bg-scale-down {
+            transform: scale(0.94) translateY(10px);
+            opacity: 0.4;
+            pointer-events: none;
+        }
 
         /* =========================================
            COMPONENTES GLOBAIS
@@ -78,7 +100,6 @@
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
-        /* Cabeçalho */
         header {
             position: sticky; top: 0; z-index: 100;
             padding: calc(20px + env(safe-area-inset-top)) 24px 20px;
@@ -116,7 +137,6 @@
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
 
-        /* Layout Principal */
         main { max-width: 800px; margin: 24px auto; padding: 0 20px; }
         .section { display: none; animation: fadeSlideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
         .section.active { display: block; }
@@ -133,6 +153,33 @@
         h2 i { color: var(--gold); font-size: 1.8rem; }
 
         /* =========================================
+           ACORDEÃO (CONTRAIR/ESTICAR)
+        ========================================= */
+        .accordion-header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-surface); padding: 18px 24px; border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.05); margin-bottom: 16px;
+            cursor: pointer; transition: background 0.3s, transform 0.2s;
+        }
+        .accordion-header:hover { background: var(--bg-surface-hover); }
+        .accordion-header:active { transform: scale(0.98); }
+        .accordion-header h2 { margin-bottom: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        
+        .accordion-icon {
+            font-size: 1.4rem; color: var(--gold);
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .accordion-icon.open { transform: rotate(180deg); }
+
+        .accordion-content {
+            display: grid; grid-template-rows: 0fr;
+            transition: grid-template-rows 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s;
+            opacity: 0; margin-bottom: 24px;
+        }
+        .accordion-content > div { overflow: hidden; }
+        .accordion-content.open { grid-template-rows: 1fr; opacity: 1; }
+
+        /* =========================================
            FORMULÁRIOS E INPUTS
         ========================================= */
         .form-group { margin-bottom: 20px; position: relative; }
@@ -141,7 +188,7 @@
             font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
         }
         
-        input[type="text"], input[type="number"], input[type="tel"], select {
+        input[type="text"], input[type="number"], input[type="tel"], input[type="date"], select {
             width: 100%; padding: 16px 20px; font-size: 16px; color: var(--text-main);
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
@@ -151,6 +198,8 @@
             outline: none; border-color: var(--gold); background: rgba(212, 175, 55, 0.05);
             box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
         }
+        
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
         input::placeholder { color: rgba(255,255,255,0.2); }
         
         button.btn {
@@ -161,11 +210,10 @@
             position: relative; overflow: hidden;
         }
         button.btn:hover { transform: translateY(-2px); box-shadow: 0 12px 25px rgba(212, 175, 55, 0.4); }
-        button.btn:active { transform: translateY(1px); }
+        button.btn:active { transform: scale(0.97); }
 
-        /* Busca */
         .search-bar input { padding-left: 50px; background: rgba(255,255,255,0.05); }
-        .search-bar i { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); font-size: 1.3rem; color: var(--text-muted); }
+        .search-bar i.left-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); font-size: 1.3rem; color: var(--text-muted); }
 
         /* =========================================
            CARDS E LISTAS
@@ -174,9 +222,11 @@
             background: var(--bg-surface); padding: 20px; border-radius: 20px; margin-bottom: 16px;
             border: 1px solid rgba(255,255,255,0.05);
             display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden;
-            transition: transform 0.2s, background 0.2s;
+            transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s, box-shadow 0.25s;
+            cursor: pointer;
         }
         .cliente-card:hover { background: var(--bg-surface-hover); }
+        .cliente-card:active { transform: scale(0.96); opacity: 0.9; } /* ANIMAÇÃO AO CLICAR */
         .cliente-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--gold); }
         
         .status-longe::before { background: var(--success); box-shadow: 0 0 10px var(--success); }
@@ -188,7 +238,6 @@
         .cliente-info span { display: flex; align-items: center; gap: 6px; }
         .cliente-info i { color: var(--gold); font-size: 1.1rem; }
 
-        /* Tabela OS */
         .os-row {
             display: grid; grid-template-columns: 70px 1fr 110px; gap: 12px; align-items: center;
             margin-bottom: 12px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 16px;
@@ -211,34 +260,65 @@
         .total-box strong { color: var(--gold); font-size: 1.8rem; font-weight: 800; letter-spacing: -1px; }
 
         /* =========================================
+           SWIPE TO EDIT/DELETE
+        ========================================= */
+        .swipe-container {
+            display: flex; overflow-x: auto; scroll-snap-type: x mandatory; 
+            scrollbar-width: none; border-radius: 20px; margin-bottom: 16px;
+        }
+        .swipe-container::-webkit-scrollbar { display: none; }
+        .swipe-card { width: 100%; flex-shrink: 0; scroll-snap-align: start; margin-bottom: 0; border-radius: 20px 0 0 20px;}
+        .swipe-actions { 
+            flex-shrink: 0; scroll-snap-align: start; display: flex; 
+            background: var(--bg-surface); border-radius: 0 20px 20px 0; overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.05); border-left: none;
+        }
+        .swipe-btn { 
+            flex: 1; border: none; color: white; cursor: pointer; display: flex; 
+            flex-direction: column; align-items: center; justify-content: center; gap: 5px; font-size: 0.8rem;
+            transition: opacity 0.2s, transform 0.2s; padding: 0 15px;
+        }
+        .swipe-btn:hover { opacity: 0.8; }
+        .swipe-btn:active { transform: scale(0.9); }
+
+        /* =========================================
            NAVEGAÇÃO INFERIOR
         ========================================= */
         nav {
             position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); 
-            left: 50%; transform: translateX(-50%); width: 92%; max-width: 450px;
+            left: 50%; transform: translateX(-50%); width: 92%; max-width: 600px;
             background: rgba(15, 15, 15, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
             border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 40px rgba(0,0,0,0.8);
             display: flex; justify-content: space-around; padding: 10px; border-radius: 30px; z-index: 100;
         }
         .nav-item {
-            background: none; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 600;
+            background: none; border: none; color: var(--text-muted); font-size: 0.70rem; font-weight: 600;
             display: flex; flex-direction: column; align-items: center; gap: 6px;
-            cursor: pointer; width: 30%; padding: 10px 0; border-radius: 20px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer; flex: 1; padding: 10px 0; border-radius: 20px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .nav-item i { font-size: 1.6rem; transition: all 0.3s; }
+        .nav-item i { font-size: 1.5rem; transition: all 0.3s; }
         .nav-item.active { background: rgba(212, 175, 55, 0.15); color: var(--gold); }
         .nav-item.active i { transform: translateY(-3px) scale(1.1); text-shadow: 0 0 15px rgba(212, 175, 55, 0.5); }
 
         /* =========================================
-           MODAIS E TOASTS
+           MODAIS E TOASTS - FIX TRANSIÇÃO
         ========================================= */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            display: none; justify-content: center; align-items: flex-end; z-index: 1000;
-            opacity: 0; transition: opacity 0.3s;
+            display: flex; /* Mudado de none para flex */
+            justify-content: center; align-items: flex-end; z-index: 1000;
+            opacity: 0; 
+            visibility: hidden; /* Mantem escondido sem quebrar a transição */
+            pointer-events: none; /* Previne clicks fantasmas */
+            transition: opacity 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.4s;
         }
-        .modal-overlay.active { display: flex; opacity: 1; }
+        .modal-overlay.active { 
+            opacity: 1; 
+            visibility: visible; 
+            pointer-events: auto; 
+        }
+        
         .modal-content {
             background-color: var(--bg-base); width: 100%; max-width: 600px; max-height: 85vh;
             overflow-y: auto; border-radius: 32px 32px 0 0; padding: 30px 24px 80px; position: relative;
@@ -256,16 +336,16 @@
             position: absolute; top: 24px; right: 24px; background: rgba(255,255,255,0.1); 
             border: none; color: var(--text-main); width: 36px; height: 36px; border-radius: 50%; 
             font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.2s;
         }
         .close-modal:hover { background: rgba(255,255,255,0.2); }
+        .close-modal:active { transform: scale(0.9); }
 
         .os-detalhe-header { text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px dashed rgba(255,255,255,0.1); }
         .os-detalhe-header h3 { background: var(--gold-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 1.6rem; font-weight: 800; letter-spacing: 1px;}
         .os-detalhe-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .os-detalhe-box { background: rgba(255,255,255,0.02); padding: 20px; border-radius: 20px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); }
 
-        /* Toast Moderno */
         #toast {
             position: fixed; top: calc(20px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) translateY(-100px);
             background: rgba(20, 20, 20, 0.9); backdrop-filter: blur(10px); border: 1px solid var(--gold);
@@ -275,8 +355,26 @@
         }
         #toast.show { transform: translateX(-50%) translateY(0); }
         #toast i { color: var(--gold); font-size: 1.4rem; }
-        
-        hr.separador { margin: 40px 0; border: none; border-top: 1px dashed rgba(255,255,255,0.1); }
+
+        /* Botões Redirecionamento */
+        .btn-whatsapp {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            color: #FFF; border: none; padding: 16px 24px; font-size: 1.1rem; font-weight: 700;
+            border-radius: 16px; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+            text-decoration: none; margin-bottom: 12px; transition: all 0.3s; text-transform: uppercase;
+            box-shadow: 0 8px 20px rgba(37, 211, 102, 0.25);
+        }
+        .btn-whatsapp:hover { transform: translateY(-2px); box-shadow: 0 12px 25px rgba(37, 211, 102, 0.4); }
+        .btn-whatsapp:active { transform: scale(0.97); }
+
+        .btn-localizacao {
+            background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4);
+            color: #60A5FA; padding: 14px 24px; font-size: 0.95rem; font-weight: 700;
+            border-radius: 16px; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+            text-decoration: none; margin-bottom: 24px; transition: all 0.3s; text-transform: uppercase;
+        }
+        .btn-localizacao:hover { background: rgba(59, 130, 246, 0.25); transform: translateY(-2px); }
+        .btn-localizacao:active { transform: scale(0.97); }
 
     </style>
 </head>
@@ -291,26 +389,46 @@
     </header>
 
     <main>
+        <!-- SEÇÕES MANTIDAS IGUAIS... -->
         <!-- SEÇÃO: NOVO SERVIÇO -->
         <section id="sec-servico" class="section active">
             <h2><i class="ph-duotone ph-wrench"></i> Nova Ordem de Serviço</h2>
             
             <div class="glass-panel" style="padding: 24px; margin-bottom: 24px;">
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group" style="margin-bottom: 20px;">
                     <label for="os-cliente">Selecione o Cliente</label>
                     <select id="os-cliente">
                         <option value="">Cadastre um cliente primeiro...</option>
                     </select>
                 </div>
+
+                <div style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1; min-width: 0; margin-bottom: 0;">
+                        <label style="font-size: 0.8rem;">Data de Coleta</label>
+                        <input type="date" id="os-data-coleta" style="width: 100%; padding: 16px 12px; font-size: 0.95rem;">
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 0; margin-bottom: 0;">
+                        <label style="font-size: 0.8rem;">Data de Entrega</label>
+                        <input type="date" id="os-data-entrega" style="width: 100%; padding: 16px 12px; font-size: 0.95rem;">
+                    </div>
+                </div>
             </div>
 
-            <div class="os-table-container" id="os-itens-container">
-                <div class="os-row os-header">
-                    <div>QTD</div>
-                    <div>Item / Especificação</div>
-                    <div>VAL UN (R$)</div>
+            <div class="accordion-header" onclick="toggleAccordion('acc-itens', this)">
+                <h2><i class="ph-duotone ph-list-numbers"></i> Itens do Serviço</h2>
+                <i class="ph-bold ph-caret-down accordion-icon open"></i>
+            </div>
+            
+            <div id="acc-itens" class="accordion-content open">
+                <div> 
+                    <div class="os-table-container" id="os-itens-container" style="margin-bottom: 8px;">
+                        <div class="os-row os-header">
+                            <div>QTD</div>
+                            <div>Item / Especificação</div>
+                            <div>VAL UN (R$)</div>
+                        </div>
+                    </div>
                 </div>
-                <!-- Injetado via JS -->
             </div>
 
             <div class="total-box">
@@ -325,32 +443,53 @@
             </button>
         </section>
 
+        <!-- SEÇÃO: AGENDAMENTO -->
+        <section id="sec-agendamento" class="section">
+            <h2><i class="ph-duotone ph-calendar-check"></i> Agendamentos</h2>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 24px; background: var(--bg-surface); padding: 16px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
+                Controle de serviços aguardando entrega e devolução aos clientes.
+            </p>
+            <div class="search-bar form-group">
+                <i class="ph ph-magnifying-glass left-icon"></i>
+                <input type="text" id="busca-agendamento" placeholder="Buscar agendamento..." oninput="filtrarAgendamentos()">
+            </div>
+            <div id="lista-agendamentos"></div>
+        </section>
+
         <!-- SEÇÃO: CLIENTES -->
         <section id="sec-clientes" class="section">
-            <h2><i class="ph-duotone ph-user-plus"></i> Novo Cliente</h2>
-            <div class="glass-panel" style="padding: 24px; margin-bottom: 30px;">
-                <div class="form-group">
-                    <label>Nome Completo</label>
-                    <input type="text" id="cli-nome" placeholder="Ex: Maria Silva">
+            <div class="accordion-header" onclick="toggleAccordion('acc-novo-cliente', this)">
+                <h2><i class="ph-duotone ph-user-plus"></i> Cadastrar Novo Cliente</h2>
+                <i class="ph-bold ph-caret-down accordion-icon"></i>
+            </div>
+            
+            <div id="acc-novo-cliente" class="accordion-content">
+                <div>
+                    <div class="glass-panel" style="padding: 24px; margin-bottom: 10px;">
+                        <div class="form-group">
+                            <label>Nome Completo</label>
+                            <input type="text" id="cli-nome" placeholder="Ex: Maria Silva">
+                        </div>
+                        <div class="form-group">
+                            <label>WhatsApp / Telefone</label>
+                            <input type="tel" id="cli-telefone" placeholder="(00) 00000-0000" oninput="maskPhone(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>Endereço Completo (Inclua a Cidade no final)</label>
+                            <input type="text" id="cli-endereco" placeholder="Ex: Rua, Nº, Bairro, Cidade">
+                        </div>
+                        <div class="form-group">
+                            <label>Ciclo de Manutenção (Dias)</label>
+                            <input type="number" id="cli-retorno" value="30" placeholder="Ex: 30">
+                        </div>
+                        <button class="btn" id="btn-salvar-cliente" onclick="salvarNovoCliente()" style="margin-top: 10px;">Salvar Cliente</button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>WhatsApp / Telefone</label>
-                    <input type="tel" id="cli-telefone" placeholder="(00) 00000-0000" oninput="maskPhone(this)">
-                </div>
-                <div class="form-group">
-                    <label>Endereço Completo</label>
-                    <input type="text" id="cli-endereco" placeholder="Rua, Nº, Bairro...">
-                </div>
-                <div class="form-group">
-                    <label>Ciclo de Manutenção (Dias)</label>
-                    <input type="number" id="cli-retorno" value="30" placeholder="Ex: 30">
-                </div>
-                <button class="btn" onclick="salvarCliente()" style="margin-top: 10px;">Salvar Cliente</button>
             </div>
 
-            <h2><i class="ph-duotone ph-users"></i> Carteira de Clientes</h2>
+            <h2 style="margin-top: 16px;"><i class="ph-duotone ph-users"></i> Carteira de Clientes</h2>
             <div class="search-bar form-group">
-                <i class="ph ph-magnifying-glass"></i>
+                <i class="ph ph-magnifying-glass left-icon"></i>
                 <input type="text" id="busca-cliente" placeholder="Buscar cliente..." oninput="filtrarClientes()">
             </div>
             <div id="lista-clientes-container"></div>
@@ -362,13 +501,51 @@
             <div id="lista-historico"></div>
         </section>
 
+        <!-- SEÇÃO: FATURAMENTO -->
+        <section id="sec-faturamento" class="section">
+            <h2><i class="ph-duotone ph-chart-bar"></i> Faturamento Mensal</h2>
+            
+            <div class="glass-panel" style="padding: 24px; margin-bottom: 24px;">
+                <div class="form-group" style="margin-bottom: 0; position: relative;">
+                    <label>Selecione o Mês</label>
+                    <select id="filtro-mes-faturamento" onchange="renderizarFaturamento()" style="text-align: center; font-weight: 700; padding: 16px 40px; appearance: none; cursor: pointer;">
+                        <!-- Injetado via JS -->
+                    </select>
+                    <i class="ph-bold ph-caret-down" style="position: absolute; right: 20px; top: 40px; font-size: 1.2rem; color: var(--gold); pointer-events: none;"></i>
+                </div>
+            </div>
+
+            <div class="total-box" style="justify-content: center; flex-direction: column; gap: 10px; text-align: center;">
+                <span style="font-weight: 600; color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Total Faturado no Mês</span>
+                <strong id="total-faturamento-mes" style="font-size: 2.5rem;">R$ 0,00</strong>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px; margin-bottom: 24px;">
+                <canvas id="chart-faturamento" height="250"></canvas>
+            </div>
+        </section>
+
         <!-- SEÇÃO: NOTIFICAÇÕES -->
         <section id="sec-notificacoes" class="section">
             <h2><i class="ph-duotone ph-chart-line-up"></i> Painel de Retornos</h2>
-            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 24px; background: var(--bg-surface); padding: 16px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
-                Acompanhe o ciclo de afiação. <br>
-                <span style="color:var(--success)">🟢 No prazo</span> | <span style="color:var(--warning)">🟠 Próximo</span> | <span style="color:var(--danger)">🔴 Atrasado</span>
-            </p>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;">
+                <div class="search-bar form-group" style="margin-bottom: 0; flex: 1; min-width: 200px; position: relative;">
+                    <i class="ph ph-map-pin left-icon" style="z-index: 10;"></i>
+                    <select id="filtro-cidade" onchange="abrirTelaNotificacoes()" style="width: 100%; padding: 16px 40px 16px 45px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; appearance: none; cursor: pointer; font-size: 0.95rem;">
+                        <option value="" style="background: #111;">Todas as cidades</option>
+                    </select>
+                    <i class="ph-bold ph-caret-down" style="position: absolute; right: 16px; left: auto; top: 50%; transform: translateY(-50%); font-size: 1rem; color: var(--text-muted); pointer-events: none;"></i>
+                </div>
+
+                <select id="filtro-status" onchange="abrirTelaNotificacoes()" style="flex: 1; min-width: 150px; padding: 16px; border-radius: 16px; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem;">
+                    <option value="todos" style="background: #111;">Todos os prazos</option>
+                    <option value="longe" style="background: #111;">🟢 Verdes (16+ dias)</option>
+                    <option value="perto" style="background: #111;">🟠 Laranjas (6 a 15 dias)</option>
+                    <option value="atrasado" style="background: #111;">🔴 Vermelhos (0 a 5 dias)</option>
+                </select>
+            </div>
+
             <div id="lista-tela-notificacoes"></div>
         </section>
     </main>
@@ -379,6 +556,10 @@
             <i class="ph-fill ph-wrench"></i>
             <span>Serviço</span>
         </button>
+        <button class="nav-item" onclick="mudarAba('sec-agendamento', this)">
+            <i class="ph-fill ph-calendar-check"></i>
+            <span>Agenda</span>
+        </button>
         <button class="nav-item" onclick="mudarAba('sec-clientes', this)">
             <i class="ph-fill ph-users"></i>
             <span>Clientes</span>
@@ -387,19 +568,90 @@
             <i class="ph-fill ph-receipt"></i>
             <span>Histórico</span>
         </button>
+        <button class="nav-item" onclick="mudarAba('sec-faturamento', this)">
+            <i class="ph-fill ph-chart-line-up"></i>
+            <span>Receita</span>
+        </button>
     </nav>
 
+    <!-- MODAL DE CONFIRMAÇÃO PERSONALIZADO -->
+    <div class="modal-overlay" id="modal-confirm" style="z-index: 2000; align-items: center;">
+        <div class="glass-panel" style="width: 90%; max-width: 400px; padding: 24px; text-align: center; border-radius: 24px; transform: scale(0.9); transition: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); opacity: 0; position: relative;" id="modal-confirm-content">
+            <i class="ph-duotone ph-warning-circle" style="font-size: 4rem; color: var(--warning); margin-bottom: 16px;"></i>
+            <h3 style="margin-bottom: 12px; font-size: 1.2rem; color: var(--text-main);" id="confirm-msg">Tem certeza?</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px;" id="confirm-desc">Essa ação não pode ser desfeita.</p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn" id="btn-confirm-cancel" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); flex: 1; padding: 14px; font-size: 0.95rem; box-shadow: none;">Cancelar</button>
+                <button class="btn" id="btn-confirm-ok" style="background: var(--danger); color: white; flex: 1; padding: 14px; font-size: 0.95rem; box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);">Sim, Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR CLIENTE -->
+    <div class="modal-overlay" id="modal-editar" onclick="fecharModalFora(event)">
+        <div class="modal-content" id="modal-editar-content">
+            <button class="close-modal" onclick="fecharModal('modal-editar')"><i class="ph-bold ph-x"></i></button>
+            <h2 style="margin-bottom: 20px; color: var(--gold);"><i class="ph-duotone ph-pencil"></i> Editar Cliente</h2>
+            <input type="hidden" id="edit-cli-id">
+            
+            <div class="form-group">
+                <label>Nome Completo</label>
+                <input type="text" id="edit-cli-nome">
+            </div>
+            <div class="form-group">
+                <label>WhatsApp / Telefone</label>
+                <input type="tel" id="edit-cli-telefone" oninput="maskPhone(this)">
+            </div>
+            <div class="form-group">
+                <label>Endereço Completo</label>
+                <input type="text" id="edit-cli-endereco">
+            </div>
+            <div class="form-group">
+                <label>Ciclo de Manutenção (Dias)</label>
+                <input type="number" id="edit-cli-retorno">
+            </div>
+            <button class="btn" onclick="salvarEdicaoCliente()" style="margin-top: 10px;">Atualizar Cadastro</button>
+        </div>
+    </div>
+
     <!-- MODAL DETALHES OS -->
-    <div class="modal-overlay" id="modal-os" onclick="fecharModalFora(event)">
+    <div class="modal-overlay" id="modal-os" onclick="fecharModalFora(event)" style="z-index: 1005;">
         <div class="modal-content" id="modal-os-content">
             <button class="close-modal" onclick="fecharModal('modal-os')"><i class="ph-bold ph-x"></i></button>
-            <div class="os-detalhe-header">
-                <h3>Gold AFIAÇÕES</h3>
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px; text-transform: uppercase; letter-spacing: 2px;">Recibo de Serviço</p>
-            </div>
             <div id="detalhes-os-conteudo"></div>
         </div>
     </div>
+
+    <!-- MODAL DETALHES DO CLIENTE -->
+    <div class="modal-overlay" id="modal-cliente" onclick="fecharModalFora(event)">
+        <div class="modal-content" id="modal-cliente-content">
+            <button class="close-modal" onclick="fecharModal('modal-cliente')"><i class="ph-bold ph-x"></i></button>
+            <div id="detalhes-cliente-conteudo"></div>
+        </div>
+    </div>
+
+    <!-- MODAL SUCESSO OS -->
+    <div class="modal-overlay" id="modal-sucesso-os" style="z-index: 3000; align-items: center;">
+        <div class="glass-panel" style="width: 90%; max-width: 400px; padding: 30px 24px; text-align: center; border-radius: 24px; transform: scale(0.9); transition: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); opacity: 0; position: relative;" id="modal-sucesso-content">
+            <button class="close-modal" onclick="fecharModalSucesso()"><i class="ph-bold ph-x"></i></button>
+            <i class="ph-fill ph-check-circle" style="font-size: 5rem; color: var(--success); margin-bottom: 10px; text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);"></i>
+            <h3 style="margin-bottom: 8px; font-size: 1.6rem; background: var(--gold-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Parabéns!</h3>
+            <p style="color: var(--text-main); font-size: 1rem; margin-bottom: 5px;" id="sucesso-cliente-nome">OS Registrada para Cliente</p>
+            <p style="color: var(--gold); font-weight: 800; font-size: 1.2rem; margin-bottom: 24px;" id="sucesso-os-numero">OS #000</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button class="btn-whatsapp" id="btn-share-wa">
+                    <i class="ph-fill ph-whatsapp-logo" style="font-size: 1.4rem;"></i> Compartilhar Recibo
+                </button>
+                <button class="btn" id="btn-baixar-pdf" style="background: rgba(212, 175, 55, 0.1); border: 1px solid var(--gold); color: var(--gold); box-shadow: none;">
+                    <i class="ph-bold ph-download-simple" style="font-size: 1.4rem;"></i> Baixar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- CONTEINER OCULTO PARA GERAR O PDF -->
+    <div id="pdf-container" style="display: none; position: absolute; left: -9999px; top: 0; width: 800px;"></div>
 
     <!-- TOAST -->
     <div id="toast"><i class="ph-fill ph-check-circle"></i> <span id="toast-msg">Sucesso!</span></div>
@@ -410,8 +662,17 @@
         let servicos = JSON.parse(localStorage.getItem('gold_servicos_v2')) || [];
         let precosSalvos = JSON.parse(localStorage.getItem('gold_precos_v2')) || {};
 
+        let patchNecessario = false;
+        servicos.forEach((s, index) => {
+            if (!s.osNumero) {
+                s.osNumero = String(index + 1).padStart(3, '0');
+                patchNecessario = true;
+            }
+        });
+        if (patchNecessario) localStorage.setItem('gold_servicos_v2', JSON.stringify(servicos));
+
+        // LISTA OFICIAL
         const listaItensOficiais = [
-            { id: 'gravacao', nome: 'Gravação de Nome', tipo: 'texto' },
             { id: 'alicate-cuticula', nome: 'Alicate Cutícula', tipo: 'numero' },
             { id: 'alicate-unha', nome: 'Alicate Unha', tipo: 'numero' },
             { id: 'molas-parafuso', nome: 'Molas / Parafuso', tipo: 'numero' },
@@ -427,6 +688,13 @@
         // --- UTILITÁRIOS ---
         const formatarMoeda = (valor) => {
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+        };
+        
+        const formatarDataBR = (dataString) => {
+            if(!dataString) return '--/--/----';
+            const partes = dataString.split('-');
+            if(partes.length !== 3) return dataString;
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
         };
 
         const maskPhone = (input) => {
@@ -444,28 +712,129 @@
             setTimeout(() => t.classList.remove('show'), 3000);
         };
 
+        function extrairCidade(endereco) {
+            if (!endereco) return '';
+            let enderecoLimpo = endereco.replace(/,\s*$/, '').trim();
+            const partes = enderecoLimpo.split(',').map(p => p.trim()).filter(p => p !== '');
+            if (partes.length === 0) return '';
+            return partes.length >= 4 ? partes[3] : partes[partes.length - 1];
+        }
+
+        function popularSelectCidades() {
+            const select = document.getElementById('filtro-cidade');
+            if(!select) return;
+            const cidadeAtual = select.value;
+            let cidades = new Set();
+            clientes.forEach(c => {
+                let cid = extrairCidade(c.endereco);
+                if (cid) cidades.add(cid);
+            });
+            let html = '<option value="" style="background: #111;">Todas as cidades</option>';
+            Array.from(cidades).sort().forEach(cid => {
+                html += `<option value="${cid}" style="background: #111;">${cid}</option>`;
+            });
+            select.innerHTML = html;
+            select.value = cidadeAtual; 
+        }
+
+        // --- SISTEMA DE ACORDEÃO ---
+        function toggleAccordion(id, element) {
+            const content = document.getElementById(id);
+            const icon = element.querySelector('.accordion-icon');
+            if (content.classList.contains('open')) {
+                content.classList.remove('open');
+                icon.classList.remove('open');
+            } else {
+                content.classList.add('open');
+                icon.classList.add('open');
+            }
+        }
+
+        function toggleBackgroundScale(ativar) {
+            const elementos = [document.querySelector('main'), document.querySelector('header'), document.querySelector('nav')];
+            elementos.forEach(el => {
+                if(el) {
+                    if(ativar) el.classList.add('bg-scale-down');
+                    else el.classList.remove('bg-scale-down');
+                }
+            });
+        }
+
+        // --- CUSTOM CONFIRM MODAL ---
+        let confirmCallback = null;
+        function customConfirm(titulo, descricao, callback) {
+            document.getElementById('confirm-msg').innerText = titulo;
+            document.getElementById('confirm-desc').innerText = descricao;
+            confirmCallback = callback;
+            
+            const modal = document.getElementById('modal-confirm');
+            modal.classList.add('active'); // CSS Visibility resolve o resto
+            toggleBackgroundScale(true);
+            
+            setTimeout(() => {
+                document.getElementById('modal-confirm-content').style.transform = 'scale(1)';
+                document.getElementById('modal-confirm-content').style.opacity = '1';
+            }, 10);
+        }
+
+        document.getElementById('btn-confirm-cancel').addEventListener('click', fecharConfirm);
+        document.getElementById('btn-confirm-ok').addEventListener('click', () => {
+            if(confirmCallback) confirmCallback();
+            fecharConfirm();
+        });
+
+        function fecharConfirm() {
+            document.getElementById('modal-confirm-content').style.transform = 'scale(0.9)';
+            document.getElementById('modal-confirm-content').style.opacity = '0';
+            setTimeout(() => {
+                const modal = document.getElementById('modal-confirm');
+                modal.classList.remove('active');
+                if(!document.querySelector('.modal-overlay.active:not(#modal-confirm)')) {
+                    toggleBackgroundScale(false);
+                }
+            }, 300);
+        }
+
         // --- INICIALIZAÇÃO ---
         window.onload = () => {
             renderizarFormularioItens();
             atualizarSelectClientes();
             renderizarListaClientes();
+            popularSelectCidades();
             renderizarHistorico();
+            renderizarAgendamentos();
             atualizarSinoNotificacoes();
+            setDatasIniciais();
+            popularSelectMesesFaturamento(); 
+            renderizarFaturamento();
         };
 
-        // --- NAVEGAÇÃO ---
+        function setDatasIniciais() {
+            const hoje = new Date();
+            document.getElementById('os-data-coleta').value = hoje.toISOString().split('T')[0];
+            
+            const entrega = new Date(hoje);
+            entrega.setDate(entrega.getDate() + 1);
+            document.getElementById('os-data-entrega').value = entrega.toISOString().split('T')[0];
+        }
+
         function mudarAba(idAba, elementoBotao) {
             document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
             document.getElementById(idAba).classList.add('active');
             
             if(elementoBotao) elementoBotao.classList.add('active');
+            
             if(idAba === 'sec-historico') renderizarHistorico();
             if(idAba === 'sec-clientes') renderizarListaClientes();
+            if(idAba === 'sec-agendamento') renderizarAgendamentos();
+            if(idAba === 'sec-faturamento') renderizarFaturamento();
+            
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // --- PREÇOS E OS ---
+        // --- LÓGICA DO SERVIÇO ---
+        // (Ocultada parcialmente por brevidade no HTML, código lógico inalterado)
         function atualizarPrecoFixo(id, valor) {
             precosSalvos[id] = parseFloat(valor) || 0;
             localStorage.setItem('gold_precos_v2', JSON.stringify(precosSalvos));
@@ -474,7 +843,6 @@
 
         function renderizarFormularioItens() {
             const container = document.getElementById('os-itens-container');
-            
             listaItensOficiais.forEach((item, index) => {
                 const row = document.createElement('div');
                 row.className = 'os-row';
@@ -482,20 +850,11 @@
                 row.style.opacity = '0';
                 
                 let precoAtual = precosSalvos[item.id] !== undefined ? precosSalvos[item.id] : '';
-
-                if (item.tipo === 'texto') {
-                    row.innerHTML = `
-                        <div><input type="text" id="qtd_${item.id}" placeholder="Nome" oninput="calcularTotal()"></div>
-                        <div class="item-name">${item.nome}</div>
-                        <div><input type="number" id="val_${item.id}" min="0" step="0.01" value="${precoAtual}" placeholder="0,00" oninput="atualizarPrecoFixo('${item.id}', this.value)"></div>
-                    `;
-                } else {
-                    row.innerHTML = `
-                        <div><input type="number" id="qtd_${item.id}" min="0" placeholder="0" oninput="calcularTotal()"></div>
-                        <div class="item-name">${item.nome}</div>
-                        <div><input type="number" id="val_${item.id}" min="0" step="0.01" value="${precoAtual}" placeholder="0,00" oninput="atualizarPrecoFixo('${item.id}', this.value)"></div>
-                    `;
-                }
+                row.innerHTML = `
+                    <div><input type="number" id="qtd_${item.id}" min="0" placeholder="0" oninput="calcularTotal()"></div>
+                    <div class="item-name">${item.nome}</div>
+                    <div><input type="number" id="val_${item.id}" min="0" step="0.01" value="${precoAtual}" placeholder="0,00" oninput="atualizarPrecoFixo('${item.id}', this.value)"></div>
+                `;
                 container.appendChild(row);
             });
         }
@@ -516,7 +875,7 @@
             listaItensOficiais.forEach(item => {
                 const inputQtd = document.getElementById(`qtd_${item.id}`);
                 const inputVal = document.getElementById(`val_${item.id}`);
-                let quantidade = item.tipo === 'texto' ? (inputQtd.value.trim() !== '' ? 1 : 0) : (parseInt(inputQtd.value) || 0);
+                let quantidade = parseInt(inputQtd.value) || 0;
                 let precoUnitario = parseFloat(inputVal.value) || 0;
                 totalGeral += (quantidade * precoUnitario);
             });
@@ -525,7 +884,11 @@
 
         function salvarServico() {
             const clienteId = document.getElementById('os-cliente').value;
+            const dataColeta = document.getElementById('os-data-coleta').value;
+            const dataEntrega = document.getElementById('os-data-entrega').value;
+            
             if (!clienteId) { alert("⚠️ Selecione um cliente."); return; }
+            if (!dataColeta || !dataEntrega) { alert("⚠️ Preencha as datas de coleta e entrega."); return; }
 
             let itensAdicionados = [];
             let totalServico = 0;
@@ -534,12 +897,12 @@
                 const inputQtd = document.getElementById(`qtd_${item.id}`);
                 const inputVal = document.getElementById(`val_${item.id}`);
                 
-                let quantidade = item.tipo === 'texto' ? (inputQtd.value.trim() !== '' ? 1 : 0) : (parseInt(inputQtd.value) || 0);
+                let quantidade = parseInt(inputQtd.value) || 0;
                 let precoUnitario = parseFloat(inputVal.value) || 0;
                 
                 if (quantidade > 0) {
                     let totalItem = quantidade * precoUnitario;
-                    itensAdicionados.push({ nome: item.nome, qtdValor: item.tipo === 'texto' ? inputQtd.value : quantidade, valorUnitario: precoUnitario, valorTotal: totalItem });
+                    itensAdicionados.push({ nome: item.nome, qtdValor: quantidade, valorUnitario: precoUnitario, valorTotal: totalItem });
                     totalServico += totalItem;
                 }
             });
@@ -547,23 +910,235 @@
             if (itensAdicionados.length === 0) { alert("⚠️ Insira a quantidade de pelo menos um item."); return; }
 
             const dataAtual = new Date();
+            const novoNumOS = String(servicos.length + 1).padStart(3, '0');
+
             servicos.push({
-                id: Date.now().toString(), clienteId, itens: itensAdicionados, total: totalServico,
-                dataStr: dataAtual.toLocaleDateString('pt-BR'), horaStr: dataAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                id: Date.now().toString(), 
+                osNumero: novoNumOS, 
+                clienteId, 
+                itens: itensAdicionados, 
+                total: totalServico,
+                dataColeta, 
+                dataEntrega,
+                concluido: false, 
+                dataStr: dataAtual.toLocaleDateString('pt-BR'), 
+                horaStr: dataAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: dataAtual.getTime()
             });
             localStorage.setItem('gold_servicos_v2', JSON.stringify(servicos));
 
+            let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
+            ocultos = ocultos.filter(id => id !== clienteId);
+            localStorage.setItem('gold_ocultas_v2', JSON.stringify(ocultos));
+
             listaItensOficiais.forEach(item => document.getElementById(`qtd_${item.id}`).value = '');
             document.getElementById('os-cliente').value = '';
             document.getElementById('os-total').innerText = 'R$ 0,00';
+            setDatasIniciais();
 
-            mostrarToast("OS Gerada com Sucesso!");
             atualizarSinoNotificacoes(); 
+            popularSelectMesesFaturamento(); 
+            abrirModalSucesso(servicos[servicos.length - 1]);
         }
 
-        // --- CLIENTES ---
-        function salvarCliente() {
+        function abrirModalSucesso(servico) {
+            const cli = clientes.find(c => c.id === servico.clienteId);
+            
+            document.getElementById('sucesso-cliente-nome').innerText = `Serviço agendado para ${cli.nome}`;
+            document.getElementById('sucesso-os-numero').innerText = `OS #${servico.osNumero}`;
+            
+            document.getElementById('btn-baixar-pdf').onclick = () => gerarReciboPDF(servico, cli);
+            document.getElementById('btn-share-wa').onclick = () => compartilharReciboWA(servico, cli);
+
+            const modal = document.getElementById('modal-sucesso-os');
+            modal.classList.add('active');
+            toggleBackgroundScale(true);
+            
+            setTimeout(() => {
+                document.getElementById('modal-sucesso-content').style.transform = 'scale(1)';
+                document.getElementById('modal-sucesso-content').style.opacity = '1';
+            }, 10);
+
+            dispararConfetes();
+        }
+
+        function fecharModalSucesso() {
+            document.getElementById('modal-sucesso-content').style.transform = 'scale(0.9)';
+            document.getElementById('modal-sucesso-content').style.opacity = '0';
+            setTimeout(() => {
+                const modal = document.getElementById('modal-sucesso-os');
+                modal.classList.remove('active');
+                toggleBackgroundScale(false);
+            }, 300);
+        }
+
+        function dispararConfetes() {
+            var duration = 3 * 1000;
+            var end = Date.now() + duration;
+            (function frame() {
+                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#D4AF37', '#FFFFFF', '#997A00'] });
+                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#D4AF37', '#FFFFFF', '#997A00'] });
+                if (Date.now() < end) { requestAnimationFrame(frame); }
+            }());
+        }
+
+        // --- FUNÇÕES PDF E WHATSAPP ---
+        function gerarReciboPDFPorId(id) {
+            const serv = servicos.find(s => s.id === id);
+            if (!serv) return;
+            const cli = clientes.find(c => c.id === serv.clienteId) || { nome: 'Desconhecido', telefone: '-' };
+            gerarReciboPDF(serv, cli);
+        }
+
+        function compartilharReciboWAPorId(id) {
+            const serv = servicos.find(s => s.id === id);
+            if (!serv) return;
+            const cli = clientes.find(c => c.id === serv.clienteId) || { nome: 'Desconhecido', telefone: '-' };
+            compartilharReciboWA(serv, cli);
+        }
+
+        function montarLayoutRecibo(serv, cli) {
+            let itensHtml = '';
+            serv.itens.forEach(item => {
+                itensHtml += `
+                    <tr>
+                        <td style="padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff; font-weight: bold; font-size: 16px;">${item.qtdValor}</td>
+                        <td style="padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #A1A1AA; font-size: 16px;">${item.nome}</td>
+                        <td style="padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right; color: #fff; font-weight: bold; font-size: 16px;">${formatarMoeda(item.valorTotal)}</td>
+                    </tr>`;
+            });
+            // (Código de template PDF abreviado mantendo a funcionalidade 100% igual)
+            return `
+                <div id="pdf-content-wrapper" style="background-color: #050505; color: #FFFFFF; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 50px; width: 800px; height: 1131px; box-sizing: border-box; position: relative; overflow: hidden; margin: 0; border: none;">
+                    <div style="text-align: center; border-bottom: 1px dashed rgba(255,255,255,0.2); padding-bottom: 25px; margin-bottom: 35px;">
+                        <h1 style="color: #D4AF37; margin: 0 0 5px 0; font-size: 36px; text-transform: uppercase; font-weight: 800;">Gold Afiações</h1>
+                        <p style="color: #A1A1AA; letter-spacing: 3px; text-transform: uppercase; margin: 0; font-size: 16px;">Recibo de Serviço</p>
+                        <h2 style="color: #D4AF37; font-size: 26px; margin: 25px 0 0 0;">OS #${serv.osNumero}</h2>
+                    </div>
+                    <div style="background-color: #111111; border: 1px solid rgba(212, 175, 55, 0.3); padding: 30px; border-radius: 15px; margin-bottom: 35px;">
+                        <p style="margin: 0 0 12px 0; font-size: 18px;"><strong>Cliente:</strong> ${cli.nome}</p>
+                        <p style="margin: 0 0 12px 0; font-size: 16px; color: #A1A1AA;"><strong>Emissão:</strong> ${serv.dataStr} às ${serv.horaStr}</p>
+                        <div style="height: 1px; background-color: rgba(255,255,255,0.1); margin: 20px 0;"></div>
+                        <p style="margin: 0 0 12px 0; font-size: 17px;"><strong>Data de Coleta:</strong> ${formatarDataBR(serv.dataColeta)}</p>
+                        <p style="margin: 0; font-size: 17px; color: #D4AF37;"><strong>Data de Entrega:</strong> ${formatarDataBR(serv.dataEntrega)}</p>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 35px; font-size: 17px;">
+                        <thead>
+                            <tr>
+                                <th style="color: #D4AF37; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.2); padding: 15px 10px;">QTD</th>
+                                <th style="color: #D4AF37; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.2); padding: 15px 10px;">DESCRIÇÃO</th>
+                                <th style="color: #D4AF37; text-align: right; border-bottom: 2px solid rgba(255,255,255,0.2); padding: 15px 10px;">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>${itensHtml}</tbody>
+                    </table>
+                    <div style="text-align: right; font-size: 22px; border-top: 1px dashed rgba(212,175,55,0.5); padding-top: 30px;">
+                        TOTAL: <strong style="color: #D4AF37; font-size: 32px; margin-left: 10px;">${formatarMoeda(serv.total)}</strong>
+                    </div>
+                </div>`;
+        }
+
+        function gerarReciboPDF(serv, cli) {
+            mostrarToast("Processando PDF...");
+            const container = document.getElementById('pdf-container');
+            container.style.display = 'block'; 
+            container.innerHTML = montarLayoutRecibo(serv, cli);
+            const element = document.getElementById('pdf-content-wrapper');
+            
+            const opt = {
+                margin:       0,
+                filename:     `Recibo_Gold_Afiacoes_OS${serv.osNumero}_${cli.nome.replace(/\s+/g, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#050505', windowWidth: 800 },
+                jsPDF:        { unit: 'px', format: [800, 1131], orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                mostrarToast("PDF Baixado com Sucesso!");
+                container.style.display = 'none';
+                container.innerHTML = '';
+            });
+        }
+
+        function compartilharReciboWA(serv, cli) {
+            let numeroLimpo = cli.telefone ? cli.telefone.replace(/\D/g, '') : '';
+            if (numeroLimpo.length === 10 || numeroLimpo.length === 11) { numeroLimpo = '55' + numeroLimpo; }
+            let texto = `*GOLD AFIAÇÕES* ✂️✨\nOlá *${cli.nome}*, seu serviço foi agendado!\n\n*OS:* #${serv.osNumero}\n*Coleta:* ${formatarDataBR(serv.dataColeta)}\n*Entrega:* ${formatarDataBR(serv.dataEntrega)}\n\n*Detalhes do Serviço:*\n`;
+            serv.itens.forEach(item => { texto += `- ${item.qtdValor}x ${item.nome}: ${formatarMoeda(item.valorTotal)}\n`; });
+            texto += `\n*TOTAL: ${formatarMoeda(serv.total)}* 💵\n\nAgradecemos a preferência! Dúvidas? É só responder essa mensagem.`;
+            const textoEncoded = encodeURIComponent(texto);
+            if (numeroLimpo) { window.open(`https://wa.me/${numeroLimpo}?text=${textoEncoded}`, '_blank');
+            } else { window.open(`https://api.whatsapp.com/send?text=${textoEncoded}`, '_blank'); }
+        }
+
+        // --- AGENDAMENTOS ---
+        function renderizarAgendamentos(termoBusca = '') {
+            const container = document.getElementById('lista-agendamentos');
+            container.innerHTML = '';
+            const termo = termoBusca.toLowerCase().trim();
+            let agendados = servicos.filter(s => s.dataEntrega && !s.concluido);
+            if (termo) { agendados = agendados.filter(s => { const cli = clientes.find(c => c.id === s.clienteId); return cli && cli.nome.toLowerCase().includes(termo); }); }
+            agendados.sort((a, b) => new Date(a.dataEntrega) - new Date(b.dataEntrega));
+
+            if (agendados.length === 0) return container.innerHTML = '<p style="color: var(--text-muted); text-align:center; padding: 20px;">Nenhum agendamento pendente encontrado.</p>';
+
+            agendados.forEach((serv, index) => {
+                const cliente = clientes.find(c => c.id === serv.clienteId) || { nome: 'Cliente Excluído' };
+                container.innerHTML += `
+                    <div class="swipe-container" style="animation: fadeSlideUp 0.4s ease forwards ${index * 0.05}s; opacity:0;">
+                        <div class="cliente-card swipe-card" style="padding: 0; margin-bottom: 0;">
+                            <div style="padding: 20px; cursor:pointer;" onclick="abrirModalOS('${serv.id}')">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span class="cliente-nome">${cliente.nome}</span>
+                                    <span style="color: var(--gold); font-size: 0.8rem; background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.3); padding: 4px 10px; border-radius: 12px; font-weight: 700;">Entrega: ${formatarDataBR(serv.dataEntrega)}</span>
+                                </div>
+                                <div class="cliente-info" style="margin-top: 10px;">
+                                    <span><strong style="color: var(--text-main);">OS #${serv.osNumero}</strong> &nbsp; | &nbsp; <i class="ph ph-calendar-plus"></i> Coleta: ${formatarDataBR(serv.dataColeta)}</span>
+                                    <span><i class="ph ph-money"></i> ${formatarMoeda(serv.total)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="swipe-actions" style="width: 170px;">
+                            <button class="swipe-btn" style="background: var(--success);" onclick="confirmarAgendamento('${serv.id}')"><i class="ph-bold ph-check-circle" style="font-size: 1.4rem;"></i> Entregue</button>
+                            <button class="swipe-btn" style="background: var(--danger);" onclick="excluirAgendamento('${serv.id}')"><i class="ph-bold ph-trash" style="font-size: 1.4rem;"></i> Excluir</button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function filtrarAgendamentos() { renderizarAgendamentos(document.getElementById('busca-agendamento').value); }
+
+        function confirmarAgendamento(id) {
+            customConfirm("Confirmar Entrega?", "O serviço será marcado como concluído e sairá da agenda.", () => {
+                const index = servicos.findIndex(s => s.id === id);
+                if(index !== -1) {
+                    servicos[index].concluido = true;
+                    localStorage.setItem('gold_servicos_v2', JSON.stringify(servicos));
+                    let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
+                    if(!ocultos.includes(servicos[index].clienteId)) { ocultos.push(servicos[index].clienteId); localStorage.setItem('gold_ocultas_v2', JSON.stringify(ocultos)); }
+                    renderizarAgendamentos(document.getElementById('busca-agendamento').value);
+                    atualizarSinoNotificacoes(); popularSelectMesesFaturamento(); mostrarToast("Entrega Confirmada!");
+                }
+            });
+        }
+
+        function excluirAgendamento(id) {
+            customConfirm("Excluir OS da Agenda?", "A ordem de serviço será apagada do histórico e agenda.", () => {
+                const serv = servicos.find(s => s.id === id);
+                if(serv) {
+                    const clienteId = serv.clienteId;
+                    servicos = servicos.filter(s => s.id !== id);
+                    localStorage.setItem('gold_servicos_v2', JSON.stringify(servicos));
+                    let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
+                    if(!ocultos.includes(clienteId)) { ocultos.push(clienteId); localStorage.setItem('gold_ocultas_v2', JSON.stringify(ocultos)); }
+                    renderizarAgendamentos(document.getElementById('busca-agendamento').value);
+                    renderizarHistorico(); atualizarSinoNotificacoes(); popularSelectMesesFaturamento(); mostrarToast("OS Excluída!");
+                }
+            });
+        }
+
+        // --- CLIENTES CRUD ---
+        function salvarNovoCliente() {
             const nome = document.getElementById('cli-nome').value.trim();
             const telefone = document.getElementById('cli-telefone').value.trim();
             const endereco = document.getElementById('cli-endereco').value.trim();
@@ -572,21 +1147,63 @@
             if (!nome) { alert("⚠️ O nome do cliente é obrigatório."); return; }
 
             clientes.push({ id: Date.now().toString(), nome, telefone, endereco, retornoDias: retorno, dataCadastro: new Date().toISOString() });
+            mostrarToast("Cliente Cadastrado!");
             localStorage.setItem('gold_clientes_v2', JSON.stringify(clientes));
             
             document.getElementById('cli-nome').value = ''; document.getElementById('cli-telefone').value = '';
             document.getElementById('cli-endereco').value = ''; document.getElementById('cli-retorno').value = '30';
             
-            atualizarSelectClientes(); renderizarListaClientes();
-            mostrarToast("Cliente Cadastrado!");
+            const accordionContent = document.getElementById('acc-novo-cliente');
+            const icon = accordionContent.previousElementSibling.querySelector('.accordion-icon');
+            accordionContent.classList.remove('open'); icon.classList.remove('open');
+            
+            atualizarSelectClientes(); popularSelectCidades(); renderizarListaClientes(); atualizarSinoNotificacoes();
+        }
+
+        function editarCliente(id) {
+            const cli = clientes.find(c => c.id === id);
+            if (!cli) return;
+            
+            document.getElementById('edit-cli-id').value = cli.id;
+            document.getElementById('edit-cli-nome').value = cli.nome;
+            document.getElementById('edit-cli-telefone').value = cli.telefone || '';
+            document.getElementById('edit-cli-endereco').value = cli.endereco || '';
+            document.getElementById('edit-cli-retorno').value = cli.retornoDias;
+            
+            const modal = document.getElementById('modal-editar');
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            toggleBackgroundScale(true);
+        }
+
+        function salvarEdicaoCliente() {
+            const id = document.getElementById('edit-cli-id').value;
+            const nome = document.getElementById('edit-cli-nome').value.trim();
+            const telefone = document.getElementById('edit-cli-telefone').value.trim();
+            const endereco = document.getElementById('edit-cli-endereco').value.trim();
+            const retorno = parseInt(document.getElementById('edit-cli-retorno').value) || 30;
+
+            if (!nome) { alert("⚠️ O nome do cliente é obrigatório."); return; }
+            const index = clientes.findIndex(c => c.id === id);
+            if (index !== -1) { clientes[index].nome = nome; clientes[index].telefone = telefone; clientes[index].endereco = endereco; clientes[index].retornoDias = retorno; }
+            localStorage.setItem('gold_clientes_v2', JSON.stringify(clientes));
+            
+            atualizarSelectClientes(); popularSelectCidades(); renderizarListaClientes(); atualizarSinoNotificacoes();
+            fecharModal('modal-editar'); mostrarToast("Cliente Atualizado!");
+        }
+
+        function excluirCliente(id) {
+            customConfirm("Excluir Cliente?", "O cadastro deste cliente será removido. Tem certeza?", () => {
+                clientes = clientes.filter(c => c.id !== id);
+                localStorage.setItem('gold_clientes_v2', JSON.stringify(clientes));
+                atualizarSelectClientes(); popularSelectCidades(); renderizarListaClientes(); atualizarSinoNotificacoes(); mostrarToast("Cliente Excluído!");
+            });
         }
 
         function atualizarSelectClientes() {
             const select = document.getElementById('os-cliente');
             select.innerHTML = '<option value="">Selecione um cliente...</option>';
-            clientes.sort((a, b) => a.nome.localeCompare(b.nome)).forEach(cli => {
-                select.innerHTML += `<option value="${cli.id}">${cli.nome}</option>`;
-            });
+            clientes.sort((a, b) => a.nome.localeCompare(b.nome)).forEach(cli => { select.innerHTML += `<option value="${cli.id}">${cli.nome}</option>`; });
         }
 
         function renderizarListaClientes(termoBusca = '') {
@@ -599,11 +1216,17 @@
 
             filtrados.sort((a, b) => a.nome.localeCompare(b.nome)).forEach(cli => {
                 container.innerHTML += `
-                    <div class="cliente-card">
-                        <div class="cliente-nome">${cli.nome}</div>
-                        <div style="height: 1px; background: rgba(255,255,255,0.05); margin: 5px 0;"></div>
-                        <div class="cliente-info"><span><i class="ph ph-whatsapp-logo"></i> ${cli.telefone || '-'}</span> <span><i class="ph ph-arrows-clockwise"></i> <strong style="color:var(--gold)">${cli.retornoDias} dias</strong></span></div>
-                        <div class="cliente-info" style="margin-top: 5px;"><span><i class="ph ph-map-pin"></i> ${cli.endereco || 'Endereço não informado'}</span></div>
+                    <div class="swipe-container">
+                        <div class="cliente-card swipe-card" onclick="abrirModalCliente('${cli.id}')">
+                            <div class="cliente-nome">${cli.nome}</div>
+                            <div style="height: 1px; background: rgba(255,255,255,0.05); margin: 5px 0;"></div>
+                            <div class="cliente-info"><span><i class="ph ph-whatsapp-logo"></i> ${cli.telefone || '-'}</span> <span><i class="ph ph-arrows-clockwise"></i> <strong style="color:var(--gold)">${cli.retornoDias} dias</strong></span></div>
+                            <div class="cliente-info" style="margin-top: 5px;"><span><i class="ph ph-map-pin"></i> ${cli.endereco || 'Endereço não informado'}</span></div>
+                        </div>
+                        <div class="swipe-actions" style="width: 140px;">
+                            <button class="swipe-btn" style="background: var(--warning);" onclick="editarCliente('${cli.id}')"><i class="ph-bold ph-pencil" style="font-size: 1.4rem;"></i> Editar</button>
+                            <button class="swipe-btn" style="background: var(--danger);" onclick="excluirCliente('${cli.id}')"><i class="ph-bold ph-trash" style="font-size: 1.4rem;"></i> Excluir</button>
+                        </div>
                     </div>`;
             });
         }
@@ -615,116 +1238,232 @@
             container.innerHTML = '';
             if (servicos.length === 0) return container.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding: 20px;">Nenhuma OS registrada.</p>';
 
-            [...servicos].sort((a, b) => b.timestamp - a.timestamp).forEach((serv, index) => {
-                const cliente = clientes.find(c => c.id === serv.clienteId) || { nome: 'Cliente Excluído' };
+            const clientesComOS = [...new Set(servicos.map(s => s.clienteId))];
+            clientesComOS.forEach((clienteId, index) => {
+                const cliente = clientes.find(c => c.id === clienteId) || { nome: 'Cliente Excluído', id: clienteId };
+                const qtdeOS = servicos.filter(s => s.clienteId === clienteId).length;
+
                 container.innerHTML += `
-                    <div class="cliente-card" onclick="abrirModalOS('${serv.id}')" style="cursor:pointer; animation: fadeSlideUp 0.4s ease forwards ${index * 0.05}s; opacity:0;">
+                    <div class="cliente-card" onclick="abrirModalCliente('${cliente.id}')" style="cursor:pointer; animation: fadeSlideUp 0.4s ease forwards ${index * 0.05}s; opacity:0;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <span class="cliente-nome">${cliente.nome}</span>
-                            <span style="color: var(--text-muted); font-size: 0.8rem; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 12px;">${serv.dataStr}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top: 10px;">
-                            <span style="color:var(--gold); font-size:0.85rem;"><i class="ph ph-magnifying-glass-plus"></i> Ver recibo</span>
-                            <div style="color:var(--text-main); font-weight:800; font-size:1.3rem;">${formatarMoeda(serv.total)}</div>
+                            <span style="color: var(--gold); font-weight: 700; font-size: 0.9rem; background: rgba(212, 175, 55, 0.1); padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.3);">${qtdeOS} OS(s)</span>
                         </div>
                     </div>`;
             });
         }
 
-        // --- MODAL & NOTIFICAÇÕES ---
+        // --- FATURAMENTO MENSAL ---
+        let graficoFaturamento = null;
+        const nomesMesesLista = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+        function popularSelectMesesFaturamento() {
+            const select = document.getElementById('filtro-mes-faturamento');
+            let periodos = new Set();
+            const hoje = new Date(); const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0'); const anoAtual = hoje.getFullYear();
+            periodos.add(`${anoAtual}-${mesAtual}`);
+            servicos.forEach(s => { if(s.dataEntrega) { const partes = s.dataEntrega.split('-'); if(partes.length >= 2) { periodos.add(`${partes[0]}-${partes[1]}`); } } });
+            const periodosOrdenados = Array.from(periodos).sort((a, b) => b.localeCompare(a));
+            let html = '';
+            periodosOrdenados.forEach(p => { const [ano, mes] = p.split('-'); const nomeMes = nomesMesesLista[parseInt(mes) - 1]; html += `<option value="${p}" style="background: #111;">${nomeMes}/${ano}</option>`; });
+            select.innerHTML = html; select.value = `${anoAtual}-${mesAtual}`;
+        }
+
+        function renderizarFaturamento() {
+            const inputMes = document.getElementById('filtro-mes-faturamento').value;
+            if (!inputMes) return;
+            const servicosMes = servicos.filter(s => s.dataEntrega && s.dataEntrega.startsWith(inputMes));
+            const totalMes = servicosMes.reduce((acc, s) => acc + s.total, 0);
+            document.getElementById('total-faturamento-mes').innerText = formatarMoeda(totalMes);
+
+            const faturamentoPorDia = {};
+            servicosMes.forEach(s => { const dia = s.dataEntrega.split('-')[2]; faturamentoPorDia[dia] = (faturamentoPorDia[dia] || 0) + s.total; });
+            const diasOrdenados = Object.keys(faturamentoPorDia).sort((a, b) => parseInt(a) - parseInt(b));
+            const labels = diasOrdenados.map(dia => `${dia}/${inputMes.split('-')[1]}`);
+            const dataValores = diasOrdenados.map(dia => faturamentoPorDia[dia]);
+            desenharGrafico(labels, dataValores);
+        }
+
+        function desenharGrafico(labels, data) {
+            const ctx = document.getElementById('chart-faturamento').getContext('2d');
+            if (graficoFaturamento) graficoFaturamento.destroy();
+            Chart.defaults.color = '#A1A1AA';
+            graficoFaturamento = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Faturamento Diário', data: data, backgroundColor: '#D4AF37', borderRadius: 6, borderWidth: 0, hoverBackgroundColor: '#F3E5AB' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' } }, x: { grid: { display: false } } } } });
+        }
+
+        // --- EXIBIÇÃO DE MODAIS (ANIMAÇÕES CORRIGIDAS) ---
         function abrirModalOS(id) {
             const serv = servicos.find(s => s.id === id);
             const cli = clientes.find(c => c.id === serv.clienteId) || { nome: 'Desconhecido', telefone: '-' };
             
             let html = `
+                <div class="os-detalhe-header">
+                    <h3>Gold AFIAÇÕES</h3>
+                    <p style="color: var(--gold); font-size: 1.1rem; font-weight: 800; margin-top: 5px;">OS #${serv.osNumero}</p>
+                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 5px; text-transform: uppercase; letter-spacing: 2px;">Recibo de Serviço</p>
+                </div>
                 <div style="margin-bottom:24px;font-size:0.95rem; background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.2); padding: 16px; border-radius: 16px;">
                     <p style="margin-bottom:8px; display:flex; justify-content:space-between;"><strong>Cliente:</strong> <span>${cli.nome}</span></p>
-                    <p style="display:flex; justify-content:space-between; color: var(--text-muted);"><strong>Emissão:</strong> <span>${serv.dataStr} às ${serv.horaStr}</span></p>
+                    <p style="display:flex; justify-content:space-between; color: var(--text-muted); margin-bottom:8px;"><strong>Emissão:</strong> <span>${serv.dataStr} às ${serv.horaStr}</span></p>
+                    <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 8px 0;"></div>
+                    <p style="display:flex; justify-content:space-between; color: var(--text-main); margin-top:8px;"><strong>Coleta:</strong> <span>${formatarDataBR(serv.dataColeta)}</span></p>
+                    <p style="display:flex; justify-content:space-between; color: var(--gold); margin-top:8px;"><strong>Entrega:</strong> <span style="font-weight: bold;">${formatarDataBR(serv.dataEntrega)}</span></p>
                 </div>
                 <div class="os-detalhe-box">
                     <div style="display:flex; justify-content:space-between; font-weight:700; margin-bottom:15px; color:var(--gold); border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px; font-size:0.8rem; text-transform:uppercase;">
                         <span style="width:40px;">Qtd</span><span style="flex-grow:1;">Descrição</span><span>Total</span>
                     </div>`;
-            serv.itens.forEach(item => {
-                html += `<div class="os-detalhe-item"><span style="width:40px; font-weight:600;">${item.qtdValor}</span><span style="flex-grow:1; color: var(--text-muted);">${item.nome}</span><span style="font-weight:700;">${formatarMoeda(item.valorTotal)}</span></div>`;
-            });
-            html += `</div><div style="text-align:right;font-size:1.6rem;font-weight:800; margin-top:24px;">TOTAL: <span style="color:var(--gold);">${formatarMoeda(serv.total)}</span></div>`;
+            serv.itens.forEach(item => { html += `<div class="os-detalhe-item"><span style="width:40px; font-weight:600;">${item.qtdValor}</span><span style="flex-grow:1; color: var(--text-muted);">${item.nome}</span><span style="font-weight:700;">${formatarMoeda(item.valorTotal)}</span></div>`; });
+            html += `</div>
+            <div style="text-align:right;font-size:1.6rem;font-weight:800; margin-top:24px; margin-bottom: 30px;">TOTAL: <span style="color:var(--gold);">${formatarMoeda(serv.total)}</span></div>
+            <div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px;">
+                <button class="btn-whatsapp" onclick="compartilharReciboWAPorId('${serv.id}')"><i class="ph-fill ph-whatsapp-logo" style="font-size: 1.4rem;"></i> Enviar no WhatsApp</button>
+                <button class="btn" style="background: rgba(212, 175, 55, 0.1); border: 1px solid var(--gold); color: var(--gold); box-shadow: none;" onclick="gerarReciboPDFPorId('${serv.id}')"><i class="ph-bold ph-download-simple" style="font-size: 1.4rem;"></i> Baixar PDF</button>
+            </div>`;
             
             document.getElementById('detalhes-os-conteudo').innerHTML = html;
+            
+            // Apenas adiciona a classe, o CSS mágico faz o resto (Slide UP!)
             document.getElementById('modal-os').classList.add('active');
             document.body.style.overflow = 'hidden';
+            toggleBackgroundScale(true);
+        }
+        
+        function abrirModalCliente(id) {
+            const cli = clientes.find(c => c.id === id);
+            if(!cli) return;
+
+            const historicoCli = servicos.filter(s => s.clienteId === id).sort((a, b) => b.timestamp - a.timestamp);
+            let numeroLimpo = cli.telefone ? cli.telefone.replace(/\D/g, '') : '';
+            if (numeroLimpo.length === 10 || numeroLimpo.length === 11) { numeroLimpo = '55' + numeroLimpo; }
+            
+            let btnWa = numeroLimpo ? `<a href="https://wa.me/${numeroLimpo}" target="_blank" class="btn-whatsapp"><i class="ph-fill ph-whatsapp-logo" style="font-size: 1.6rem;"></i> Chamar no WhatsApp</a>` : `<button class="btn" style="background: var(--bg-surface); color: var(--text-muted); margin-bottom: 12px;" disabled>Telefone não cadastrado</button>`;
+            let btnLocation = cli.endereco ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cli.endereco)}" target="_blank" class="btn-localizacao"><i class="ph-fill ph-map-pin" style="font-size: 1.4rem;"></i> Ver no Mapa</a>` : `<button class="btn-localizacao" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); cursor: not-allowed;" disabled>Endereço não cadastrado</button>`;
+
+            let htmlHistorico = '<h4 style="color: var(--gold); margin-bottom: 16px; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;"><i class="ph-duotone ph-clock-counter-clockwise"></i> Histórico do Cliente</h4>';
+            if (historicoCli.length === 0) { htmlHistorico += '<p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 20px; background: rgba(255,255,255,0.02); border-radius: 16px;">Nenhum serviço registrado.</p>'; } else {
+                htmlHistorico += '<div style="display: flex; flex-direction: column; gap: 12px;">';
+                historicoCli.forEach(serv => {
+                    htmlHistorico += `
+                        <div class="cliente-card" onclick="abrirModalOS('${serv.id}')" style="margin-bottom: 0; background: rgba(255,255,255,0.02);">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-weight: 800; color: var(--gold); font-size: 1.1rem;">OS #${serv.osNumero}</span>
+                                <span style="font-weight: 600; color: var(--text-main);">${serv.dataStr}</span>
+                            </div>
+                            <div style="height: 1px; background: rgba(255,255,255,0.05); margin: 8px 0;"></div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+                                <span>Coleta: ${formatarDataBR(serv.dataColeta)}</span>
+                                <span style="color:var(--text-main); font-weight: 800; font-size: 1.05rem;">${formatarMoeda(serv.total)}</span>
+                            </div>
+                        </div>`;
+                });
+                htmlHistorico += '</div>';
+            }
+
+            let html = `
+                <div style="margin-bottom:24px; text-align:center;">
+                    <h2 style="justify-content: center; margin-bottom: 8px; font-size: 1.8rem; color: var(--text-main);">${cli.nome}</h2>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">${cli.endereco || 'Endereço não informado'}</p>
+                    <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 5px;"><i class="ph-fill ph-arrows-clockwise" style="color: var(--gold);"></i> Ciclo: ${cli.retornoDias} dias</p>
+                </div>
+                ${btnWa}${btnLocation}${htmlHistorico}
+            `;
+
+            document.getElementById('detalhes-cliente-conteudo').innerHTML = html;
+            
+            // Apenas adiciona a classe, o CSS mágico faz o resto (Slide UP!)
+            document.getElementById('modal-cliente').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            toggleBackgroundScale(true); 
         }
 
         function obterStatusClientes() {
-            const agora = new Date().getTime();
-            let listaStatus = [];
-
-            clientes.forEach(cliente => {
-                const servsCli = servicos.filter(s => s.clienteId === cliente.id);
-                if (servsCli.length > 0) {
-                    const dataBase = Math.max(...servsCli.map(s => s.timestamp));
-                    const vencimento = dataBase + (cliente.retornoDias * 24 * 60 * 60 * 1000);
-                    const diasRestantes = Math.ceil((vencimento - agora) / (1000 * 60 * 60 * 24));
-                    listaStatus.push({ cliente, diasRestantes, vencimento });
-                }
-            });
+            const agora = new Date().getTime(); let listaStatus = [];
+            clientes.forEach(cliente => { const servsCli = servicos.filter(s => s.clienteId === cliente.id); if (servsCli.length > 0) { const dataBase = Math.max(...servsCli.map(s => s.timestamp)); const vencimento = dataBase + (cliente.retornoDias * 24 * 60 * 60 * 1000); const diasRestantes = Math.ceil((vencimento - agora) / (1000 * 60 * 60 * 24)); listaStatus.push({ cliente, diasRestantes, vencimento }); } });
             return listaStatus;
         }
 
         function atualizarSinoNotificacoes() {
+            let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
             const status = obterStatusClientes();
-            const atrasados = status.filter(s => s.diasRestantes <= 0).length;
+            const atrasados = status.filter(s => s.diasRestantes <= 5 && !ocultos.includes(s.cliente.id)).length;
             const badge = document.getElementById('notificacao-badge');
-            badge.innerText = atrasados;
-            badge.style.display = atrasados > 0 ? 'flex' : 'none';
+            badge.innerText = atrasados; badge.style.display = atrasados > 0 ? 'flex' : 'none';
         }
 
         function abrirTelaNotificacoes() {
-            document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
-            mudarAba('sec-notificacoes', null);
-            
-            const listaHtml = document.getElementById('lista-tela-notificacoes');
-            listaHtml.innerHTML = '';
-            
-            let statusClientes = obterStatusClientes().sort((a, b) => a.diasRestantes - b.diasRestantes);
-
-            if (statusClientes.length === 0) {
-                return listaHtml.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding: 30px;">Nenhum histórico de afiação.</p>';
+            if(document.getElementById('sec-notificacoes').style.display !== 'block' && document.getElementById('sec-notificacoes').className.indexOf('active') === -1) {
+                document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active')); mudarAba('sec-notificacoes', null);
             }
+            
+            const listaHtml = document.getElementById('lista-tela-notificacoes'); listaHtml.innerHTML = '';
+            let statusClientes = obterStatusClientes().sort((a, b) => a.diasRestantes - b.diasRestantes);
+            if (statusClientes.length === 0) { return listaHtml.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding: 30px;">Nenhum histórico de afiação.</p>'; }
+
+            const termoCidade = document.getElementById('filtro-cidade')?.value || ''; const termoStatus = document.getElementById('filtro-status')?.value || 'todos';
+            let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
+            let contagemVisivel = 0;
 
             statusClientes.forEach((item, index) => {
-                let corClasse = 'status-longe';
-                let textoDias = `Faltam ${item.diasRestantes} dias`;
-                let corTexto = 'var(--success)';
-                let icon = 'ph-check-circle';
+                if (ocultos.includes(item.cliente.id)) return; 
+                const cidadeCli = extrairCidade(item.cliente.endereco); if (termoCidade && cidadeCli !== termoCidade) return;
+                let corClasse, corTexto, icon, textoDias;
 
-                if (item.diasRestantes <= 5 && item.diasRestantes > 0) {
-                    corClasse = 'status-perto'; corTexto = 'var(--warning)'; icon = 'ph-warning';
-                } else if (item.diasRestantes <= 0) {
-                    corClasse = 'status-atrasado'; 
-                    textoDias = item.diasRestantes === 0 ? 'VENCE HOJE!' : `ATRASADO (${Math.abs(item.diasRestantes)} dias)`;
-                    corTexto = 'var(--danger)'; icon = 'ph-warning-circle';
-                }
+                if (item.diasRestantes >= 16) { corClasse = 'status-longe'; corTexto = 'var(--success)'; icon = 'ph-check-circle'; textoDias = `Faltam ${item.diasRestantes} dias`; } 
+                else if (item.diasRestantes >= 6 && item.diasRestantes <= 15) { corClasse = 'status-perto'; corTexto = 'var(--warning)'; icon = 'ph-warning'; textoDias = `Faltam ${item.diasRestantes} dias`; } 
+                else { corClasse = 'status-atrasado'; corTexto = 'var(--danger)'; icon = 'ph-warning-circle'; textoDias = item.diasRestantes <= 0 ? 'ATRASADO/HOJE' : `Faltam ${item.diasRestantes} dias`; }
 
+                if(termoStatus === 'longe' && item.diasRestantes < 16) return; if(termoStatus === 'perto' && (item.diasRestantes < 6 || item.diasRestantes > 15)) return; if(termoStatus === 'atrasado' && item.diasRestantes > 5) return;
+                
+                contagemVisivel++;
                 listaHtml.innerHTML += `
-                    <div class="cliente-card ${corClasse}" style="animation: fadeSlideUp 0.4s ease forwards ${index * 0.05}s; opacity:0;">
-                        <div class="cliente-info" style="margin-bottom: 8px;">
-                            <span class="cliente-nome" style="color: var(--text-main); font-size:1.1rem;">${item.cliente.nome}</span>
-                            <strong style="color: ${corTexto}; font-size: 0.9rem; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 12px; display:flex; align-items:center; gap:5px;"><i class="ph-fill ${icon}"></i> ${textoDias}</strong>
+                    <div class="swipe-container" style="animation: fadeSlideUp 0.4s ease forwards ${index * 0.05}s; opacity:0;">
+                        <div class="cliente-card swipe-card ${corClasse}" style="margin-bottom: 0; display:flex; flex-direction:column; justify-content:center;">
+                            <div style="display:flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <div style="flex: 1;">
+                                    <div class="cliente-info" style="margin-bottom: 8px;"><span class="cliente-nome" style="color: var(--text-main); font-size:1.1rem;">${item.cliente.nome}</span></div>
+                                    <div class="cliente-info" style="font-size:0.85rem; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                        <strong style="color: ${corTexto}; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 12px; display:flex; gap:5px;"><i class="ph-fill ${icon}"></i> ${textoDias}</strong>
+                                        <span><i class="ph ph-map-pin"></i> ${cidadeCli || 'Sem Endereço'}</span>
+                                        <span><i class="ph ph-calendar-blank"></i> Est.: <strong style="color:var(--text-main); margin-left: 5px;">${new Date(item.vencimento).toLocaleDateString('pt-BR')}</strong></span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="cliente-info" style="font-size:0.85rem;">
-                            <span><i class="ph ph-whatsapp-logo"></i> ${item.cliente.telefone || '-'}</span>
-                            <span>Retorno est.: <strong style="color:var(--text-main)">${new Date(item.vencimento).toLocaleDateString('pt-BR')}</strong></span>
+                        <div class="swipe-actions" style="width: 85px;">
+                            <button class="swipe-btn" style="background: var(--danger);" onclick="excluirNotificacao('${item.cliente.id}')"><i class="ph-bold ph-trash" style="font-size: 1.4rem;"></i> Excluir</button>
                         </div>
                     </div>`;
+            });
+            if(contagemVisivel === 0) { listaHtml.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding: 30px;">Nenhuma notificação encontrada com os filtros atuais.</p>'; }
+        }
+
+        function excluirNotificacao(id) {
+            customConfirm("Excluir Notificação?", "Aviso removido do painel até o próximo serviço do cliente.", () => {
+                let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
+                ocultos.push(id); localStorage.setItem('gold_ocultas_v2', JSON.stringify(ocultos));
+                abrirTelaNotificacoes(); atualizarSinoNotificacoes(); mostrarToast("Notificação Excluída!");
             });
         }
 
         function fecharModal(idModal) { 
+            // Apenas remove a classe. O CSS de Transição fará o elemento sumir com Slide Down suavemente
             document.getElementById(idModal).classList.remove('active'); 
-            document.body.style.overflow = 'auto';
+            
+            // Só volta a tela ao normal (tira o blur/scale do background) se não houver mais modais abertos
+            if(!document.querySelector('.modal-overlay.active')) {
+                document.body.style.overflow = 'auto';
+                toggleBackgroundScale(false);
+            }
         }
-        function fecharModalFora(event) { if (event.target.id === 'modal-os') fecharModal('modal-os'); }
+        
+        function fecharModalFora(event) { 
+            if (event.target.id === 'modal-os') fecharModal('modal-os'); 
+            if (event.target.id === 'modal-cliente') fecharModal('modal-cliente'); 
+            if (event.target.id === 'modal-editar') fecharModal('modal-editar'); 
+            if (event.target.id === 'modal-confirm') fecharConfirm();
+            if (event.target.id === 'modal-sucesso-os') fecharModalSucesso();
+        }
     </script>
 </body>
 </html>
