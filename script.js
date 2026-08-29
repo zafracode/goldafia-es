@@ -201,7 +201,7 @@ function mudarAba(idAba, elementoBotao) {
     if(idAba === 'sec-agendamento') renderizarAgendamentos();
     if(idAba === 'sec-faturamento') renderizarFaturamento();
     
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo(0, 0);
 }
 
 // --- LÓGICA DO SERVIÇO ---
