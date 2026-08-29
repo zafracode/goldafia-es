@@ -1,18 +1,14 @@
-// --- BANCO DE DADOS ---
-let clientes = JSON.parse(localStorage.getItem('gold_clientes_v2')) || [];
-let servicos = JSON.parse(localStorage.getItem('gold_servicos_v2')) || [];
-let precosSalvos = JSON.parse(localStorage.getItem('gold_precos_v2')) || {};
+// --- SUPABASE SETUP ---
+const supabaseUrl = 'https://hmgvbzaybsfnrjhhgpdl.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZ3ZiemF5YnNmbnJqaGhncGRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwMDI4ODUsImV4cCI6MjEwMzU3ODg4NX0.BDKUq3-O9CImiu1tpxD-QTtbeTAt6MlOjo7MUt9hkBY';
+const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-let patchNecessario = false;
-servicos.forEach((s, index) => {
-    if (!s.osNumero) {
-        s.osNumero = String(index + 1).padStart(3, '0');
-        patchNecessario = true;
-    }
-});
-if (patchNecessario) localStorage.setItem('gold_servicos_v2', JSON.stringify(servicos));
+// --- ESTADO LOCAL SINCRONIZADO ---
+let clientes = [];
+let servicos = [];
+let precosSalvos = {};
+let itensCustomizados = [];
 
-// LISTA OFICIAL BASE
 const listaItensOficiais = [
     { id: 'alicate-cuticula', nome: 'Alicate Cutícula', tipo: 'numero' },
     { id: 'alicate-unha', nome: 'Alicate Unha', tipo: 'numero' },
@@ -25,39 +21,71 @@ const listaItensOficiais = [
     { id: 'frete', nome: 'Taxa de Entrega', tipo: 'numero' },
     { id: 'outros', nome: 'Outros Serviços', tipo: 'numero' }
 ];
+let listaItensAtiva = [];
 
-// LISTA CUSTOMIZADA (Futuro Banco de Dados)
-let itensCustomizados = JSON.parse(localStorage.getItem('gold_itens_custom_v2')) || [];
-let listaItensAtiva = [...listaItensOficiais, ...itensCustomizados];
+// --- INICIALIZAÇÃO ASSÍNCRONA ---
+window.onload = async () => {
+    await carregarDadosDoSupabase();
+    
+    renderizarFormularioItens();
+    atualizarSelectClientes();
+    popularSelectCidades();
+    atualizarSinoNotificacoes();
+    setDatasIniciais();
+    popularSelectMesesFaturamento(); 
+};
 
-// FUNÇÃO PARA ADICIONAR NOVO EQUIPAMENTO
-function adicionarNovoItem() {
+async function carregarDadosDoSupabase() {
+    const { data: dbClientes } = await supabaseClient.from('clientes').select('*');
+    if (dbClientes) {
+        clientes = dbClientes.map(c => ({
+            id: c.id, nome: c.nome, telefone: c.telefone, endereco: c.endereco, retornoDias: c.retorno_dias, oculto: c.oculto
+        }));
+    }
+
+    const { data: dbServicos } = await supabaseClient.from('servicos').select('*');
+    if (dbServicos) {
+        servicos = dbServicos.map(s => {
+            const data = new Date(s.created_at);
+            return {
+                id: s.id, osNumero: s.os_numero, clienteId: s.cliente_id, itens: s.itens, 
+                total: parseFloat(s.total), dataColeta: s.data_coleta, dataEntrega: s.data_entrega, 
+                concluido: s.concluido, dataStr: data.toLocaleDateString('pt-BR'), 
+                horaStr: data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: data.getTime()
+            };
+        });
+    }
+
+    const { data: dbItens } = await supabaseClient.from('itens').select('*');
+    if (dbItens) {
+        itensCustomizados = [];
+        dbItens.forEach(i => {
+            precosSalvos[i.id] = parseFloat(i.preco);
+            if (i.is_custom) { itensCustomizados.push({ id: i.id, nome: i.nome, tipo: 'numero' }); }
+        });
+    }
+    listaItensAtiva = [...listaItensOficiais, ...itensCustomizados];
+}
+
+async function adicionarNovoItem() {
     const inputNome = document.getElementById('novo-item-nome');
     const nome = inputNome.value.trim();
     if (!nome) return;
 
-    // Gera um ID único
-    const novoItem = {
-        id: 'custom_' + Date.now(),
-        nome: nome,
-        tipo: 'numero'
-    };
+    const idUnico = 'custom_' + Date.now();
+    await supabaseClient.from('itens').insert([{ id: idUnico, nome: nome, preco: 0, is_custom: true }]);
 
-    // Salva no Local Storage
+    const novoItem = { id: idUnico, nome: nome, tipo: 'numero' };
     itensCustomizados.push(novoItem);
-    localStorage.setItem('gold_itens_custom_v2', JSON.stringify(itensCustomizados));
-
-    // Atualiza a interface da OS
     listaItensAtiva.push(novoItem);
     renderizarFormularioItens();
     
-    inputNome.value = ''; // Limpa o campo
+    inputNome.value = '';
 }
 
 // --- UTILITÁRIOS ---
-const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
-};
+const formatarMoeda = (valor) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
 
 const formatarDataBR = (dataString) => {
     if(!dataString) return '--/--/----';
@@ -74,10 +102,6 @@ const maskPhone = (input) => {
     input.value = val;
 };
 
-const mostrarToast = (msg) => {
-    // Função desativada a pedido do usuário (para sumir com a notificação)
-};
-
 function extrairCidade(endereco) {
     if (!endereco) return '';
     let enderecoLimpo = endereco.replace(/,\s*$/, '').trim();
@@ -91,42 +115,30 @@ function popularSelectCidades() {
     if(!select) return;
     const cidadeAtual = select.value;
     let cidades = new Set();
-    clientes.forEach(c => {
-        let cid = extrairCidade(c.endereco);
-        if (cid) cidades.add(cid);
-    });
+    clientes.forEach(c => { let cid = extrairCidade(c.endereco); if (cid) cidades.add(cid); });
     let html = '<option value="" style="background: #111;">Todas as cidades</option>';
-    Array.from(cidades).sort().forEach(cid => {
-        html += `<option value="${cid}" style="background: #111;">${cid}</option>`;
-    });
+    Array.from(cidades).sort().forEach(cid => { html += `<option value="${cid}" style="background: #111;">${cid}</option>`; });
     select.innerHTML = html;
     select.value = cidadeAtual; 
 }
 
-// --- SISTEMA DE ACORDEÃO ---
 function toggleAccordion(id, element) {
     const content = document.getElementById(id);
     const icon = element.querySelector('.accordion-icon');
     if (content.classList.contains('open')) {
-        content.classList.remove('open');
-        icon.classList.remove('open');
+        content.classList.remove('open'); icon.classList.remove('open');
     } else {
-        content.classList.add('open');
-        icon.classList.add('open');
+        content.classList.add('open'); icon.classList.add('open');
     }
 }
 
 function toggleBackgroundScale(ativar) {
     const elementos = [document.querySelector('main'), document.querySelector('header'), document.querySelector('nav')];
     elementos.forEach(el => {
-        if(el) {
-            if(ativar) el.classList.add('bg-scale-down');
-            else el.classList.remove('bg-scale-down');
-        }
+        if(el) { ativar ? el.classList.add('bg-scale-down') : el.classList.remove('bg-scale-down'); }
     });
 }
 
-// --- CUSTOM CONFIRM MODAL ---
 let confirmCallback = null;
 function customConfirm(titulo, descricao, callback) {
     document.getElementById('confirm-msg').innerText = titulo;
@@ -144,10 +156,7 @@ function customConfirm(titulo, descricao, callback) {
 }
 
 document.getElementById('btn-confirm-cancel').addEventListener('click', fecharConfirm);
-document.getElementById('btn-confirm-ok').addEventListener('click', () => {
-    if(confirmCallback) confirmCallback();
-    fecharConfirm();
-});
+document.getElementById('btn-confirm-ok').addEventListener('click', () => { if(confirmCallback) confirmCallback(); fecharConfirm(); });
 
 function fecharConfirm() {
     document.getElementById('modal-confirm-content').style.transform = 'scale(0.9)';
@@ -155,34 +164,13 @@ function fecharConfirm() {
     setTimeout(() => {
         const modal = document.getElementById('modal-confirm');
         modal.classList.remove('active');
-        if(!document.querySelector('.modal-overlay.active:not(#modal-confirm)')) {
-            toggleBackgroundScale(false);
-        }
+        if(!document.querySelector('.modal-overlay.active:not(#modal-confirm)')) { toggleBackgroundScale(false); }
     }, 300);
 }
-
-// --- INICIALIZAÇÃO OTIMIZADA ---
-window.onload = () => {
-    // Carrega apenas o essencial para a tela inicial
-    renderizarFormularioItens();
-    atualizarSelectClientes();
-    popularSelectCidades();
-    atualizarSinoNotificacoes();
-    setDatasIniciais();
-    popularSelectMesesFaturamento(); 
-    
-    // As funções abaixo foram removidas daqui para aplicar o "Lazy Loading".
-    // Elas só serão processadas quando o usuário clicar em suas respectivas abas.
-    // renderizarListaClientes();
-    // renderizarHistorico();
-    // renderizarAgendamentos();
-    // renderizarFaturamento();
-};
 
 function setDatasIniciais() {
     const hoje = new Date();
     document.getElementById('os-data-coleta').value = hoje.toISOString().split('T')[0];
-    
     const entrega = new Date(hoje);
     entrega.setDate(entrega.getDate() + 1);
     document.getElementById('os-data-entrega').value = entrega.toISOString().split('T')[0];
@@ -195,33 +183,24 @@ function mudarAba(idAba, elementoBotao) {
     
     if(elementoBotao) elementoBotao.classList.add('active');
     
-    // Lazy Loading: Renderiza a lista de dados apenas na hora de acessar a aba
     if(idAba === 'sec-historico') renderizarHistorico();
     if(idAba === 'sec-clientes') renderizarListaClientes();
     if(idAba === 'sec-agendamento') renderizarAgendamentos();
     if(idAba === 'sec-faturamento') renderizarFaturamento();
     
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// --- LÓGICA DO SERVIÇO ---
-function atualizarPrecoFixo(id, valor) {
-    precosSalvos[id] = parseFloat(valor) || 0;
-    localStorage.setItem('gold_precos_v2', JSON.stringify(precosSalvos));
+async function atualizarPrecoFixo(id, valor) {
+    const valorNumerico = parseFloat(valor) || 0;
+    precosSalvos[id] = valorNumerico;
+    await supabaseClient.from('itens').update({ preco: valorNumerico }).eq('id', id);
     calcularTotal();
 }
 
 function renderizarFormularioItens() {
     const container = document.getElementById('os-itens-container');
-    
-    // Recria o cabeçalho
-    container.innerHTML = `
-        <div class="os-row os-header">
-            <div>QTD</div>
-            <div>Item / Especificação</div>
-            <div>VAL UN (R$)</div>
-        </div>
-    `;
+    container.innerHTML = `<div class="os-row os-header"><div>QTD</div><div>Item / Especificação</div><div>VAL UN (R$)</div></div>`;
 
     listaItensAtiva.forEach((item, index) => {
         const row = document.createElement('div');
@@ -242,12 +221,8 @@ function renderizarFormularioItens() {
 function animarNumero(id, valorFinal) {
     const elemento = document.getElementById(id);
     elemento.innerText = formatarMoeda(valorFinal);
-    elemento.style.transform = 'scale(1.1)';
-    elemento.style.color = '#FFF';
-    setTimeout(() => {
-        elemento.style.transform = 'scale(1)';
-        elemento.style.color = 'var(--gold)';
-    }, 150);
+    elemento.style.transform = 'scale(1.1)'; elemento.style.color = '#FFF';
+    setTimeout(() => { elemento.style.transform = 'scale(1)'; elemento.style.color = 'var(--gold)'; }, 150);
 }
 
 function calcularTotal() {
@@ -262,7 +237,7 @@ function calcularTotal() {
     animarNumero('os-total', totalGeral);
 }
 
-function salvarServico() {
+async function salvarServico() {
     const clienteId = document.getElementById('os-cliente').value;
     const dataColeta = document.getElementById('os-data-coleta').value;
     const dataEntrega = document.getElementById('os-data-entrega').value;
@@ -276,7 +251,6 @@ function salvarServico() {
     listaItensAtiva.forEach(item => {
         const inputQtd = document.getElementById(`qtd_${item.id}`);
         const inputVal = document.getElementById(`val_${item.id}`);
-        
         let quantidade = parseInt(inputQtd.value) || 0;
         let precoUnitario = parseFloat(inputVal.value) || 0;
         
@@ -289,44 +263,29 @@ function salvarServico() {
 
     if (itensAdicionados.length === 0) { alert("⚠️ Insira a quantidade de pelo menos um item."); return; }
 
-    const dataAtual = new Date();
     const novoNumOS = String(servicos.length + 1).padStart(3, '0');
 
-    servicos.push({
-        id: Date.now().toString(), 
-        osNumero: novoNumOS, 
-        clienteId, 
-        itens: itensAdicionados, 
-        total: totalServico,
-        dataColeta, 
-        dataEntrega,
-        concluido: false, 
-        dataStr: dataAtual.toLocaleDateString('pt-BR'), 
-        horaStr: dataAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        timestamp: dataAtual.getTime()
-    });
-    localStorage.setItem('gold_servicos_v2', JSON.stringify(servicos));
+    const { data: novoServico } = await supabaseClient.from('servicos').insert([{
+        os_numero: novoNumOS, cliente_id: clienteId, itens: itensAdicionados,
+        total: totalServico, data_coleta: dataColeta, data_entrega: dataEntrega, concluido: false
+    }]).select();
 
-    let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
-    ocultos = ocultos.filter(id => id !== clienteId);
-    localStorage.setItem('gold_ocultas_v2', JSON.stringify(ocultos));
+    if(novoServico) {
+        await supabaseClient.from('clientes').update({ oculto: false }).eq('id', clienteId);
+        await carregarDadosDoSupabase();
+        
+        listaItensAtiva.forEach(item => { const field = document.getElementById(`qtd_${item.id}`); if(field) field.value = ''; });
+        document.getElementById('os-cliente').value = '';
+        document.getElementById('os-total').innerText = 'R$ 0,00';
+        setDatasIniciais();
 
-    listaItensAtiva.forEach(item => {
-        const field = document.getElementById(`qtd_${item.id}`);
-        if(field) field.value = '';
-    });
-    document.getElementById('os-cliente').value = '';
-    document.getElementById('os-total').innerText = 'R$ 0,00';
-    setDatasIniciais();
-
-    atualizarSinoNotificacoes(); 
-    popularSelectMesesFaturamento(); 
-    abrirModalSucesso(servicos[servicos.length - 1]);
+        atualizarSinoNotificacoes(); popularSelectMesesFaturamento(); 
+        abrirModalSucesso(servicos.find(s => s.id === novoServico[0].id));
+    }
 }
 
 function abrirModalSucesso(servico) {
     const cli = clientes.find(c => c.id === servico.clienteId);
-    
     document.getElementById('sucesso-cliente-nome').innerText = `Serviço agendado para ${cli.nome}`;
     document.getElementById('sucesso-os-numero').innerText = `OS #${servico.osNumero}`;
     
@@ -334,14 +293,12 @@ function abrirModalSucesso(servico) {
     document.getElementById('btn-share-wa').onclick = () => compartilharReciboWA(servico, cli);
 
     const modal = document.getElementById('modal-sucesso-os');
-    modal.classList.add('active');
-    toggleBackgroundScale(true);
+    modal.classList.add('active'); toggleBackgroundScale(true);
     
     setTimeout(() => {
         document.getElementById('modal-sucesso-content').style.transform = 'scale(1)';
         document.getElementById('modal-sucesso-content').style.opacity = '1';
     }, 10);
-
     dispararConfetes();
 }
 
@@ -350,14 +307,12 @@ function fecharModalSucesso() {
     document.getElementById('modal-sucesso-content').style.opacity = '0';
     setTimeout(() => {
         const modal = document.getElementById('modal-sucesso-os');
-        modal.classList.remove('active');
-        toggleBackgroundScale(false);
+        modal.classList.remove('active'); toggleBackgroundScale(false);
     }, 300);
 }
 
 function dispararConfetes() {
-    var duration = 3 * 1000;
-    var end = Date.now() + duration;
+    var duration = 3 * 1000; var end = Date.now() + duration;
     (function frame() {
         confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#D4AF37', '#FFFFFF', '#997A00'] });
         confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#D4AF37', '#FFFFFF', '#997A00'] });
@@ -365,7 +320,10 @@ function dispararConfetes() {
     }());
 }
 
-// --- FUNÇÕES PDF E WHATSAPP ---
+// ==========================================
+// --- FUNÇÕES PDF CORRIGIDAS DEFINITIVAS ---
+// ==========================================
+
 function gerarReciboPDFPorId(id) {
     const serv = servicos.find(s => s.id === id);
     if (!serv) return;
@@ -384,72 +342,151 @@ function montarLayoutRecibo(serv, cli) {
     let itensHtml = '';
     serv.itens.forEach(item => {
         itensHtml += `
-            <tr>
-                <td style="padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff; font-weight: bold; font-size: 16px;">${item.qtdValor}</td>
-                <td style="padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #A1A1AA; font-size: 16px;">${item.nome}</td>
-                <td style="padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right; color: #fff; font-weight: bold; font-size: 16px;">${formatarMoeda(item.valorTotal)}</td>
-            </tr>`;
+            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 15px;">
+                <span style="width: 40px; font-weight: 600; color: #FFFFFF;">${item.qtdValor}</span>
+                <span style="flex-grow: 1; text-align: left; color: #A1A1AA;">${item.nome}</span>
+                <span style="font-weight: 700; color: #FFFFFF;">${formatarMoeda(item.valorTotal)}</span>
+            </div>
+        `;
     });
+    
+    // Tratamento para garantir que o telefone não exiba "undefined"
+    const telefoneCli = cli.telefone ? cli.telefone : '-';
+    
     return `
-        <div id="pdf-content-wrapper" style="background-color: #050505; color: #FFFFFF; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 50px; width: 800px; height: 1131px; box-sizing: border-box; position: relative; overflow: hidden; margin: 0; border: none;">
-            <div style="text-align: center; border-bottom: 1px dashed rgba(255,255,255,0.2); padding-bottom: 25px; margin-bottom: 35px;">
-                <h1 style="color: #D4AF37; margin: 0 0 5px 0; font-size: 36px; text-transform: uppercase; font-weight: 800;">Gold Afiações</h1>
-                <p style="color: #A1A1AA; letter-spacing: 3px; text-transform: uppercase; margin: 0; font-size: 16px;">Recibo de Serviço</p>
-                <h2 style="color: #D4AF37; font-size: 26px; margin: 25px 0 0 0;">OS #${serv.osNumero}</h2>
+        <div id="pdf-content-wrapper" style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; padding: 40px; background-color: #050505; color: #FFFFFF; width: 100%; min-height: 297mm; box-sizing: border-box;">
+            
+            <!-- Cabeçalho -->
+            <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px dashed rgba(255,255,255,0.1);">
+                <h1 style="color: #D4AF37; font-size: 28px; font-weight: 800; margin: 0; letter-spacing: 1px; text-transform: uppercase;">Gold AFIAÇÕES</h1>
+                <p style="color: #D4AF37; font-size: 18px; font-weight: 800; margin: 10px 0 5px 0;">OS #${serv.osNumero}</p>
+                <p style="color: #A1A1AA; font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 2px;">Recibo de Serviço</p>
             </div>
-            <div style="background-color: #111111; border: 1px solid rgba(212, 175, 55, 0.3); padding: 30px; border-radius: 15px; margin-bottom: 35px;">
-                <p style="margin: 0 0 12px 0; font-size: 18px;"><strong>Cliente:</strong> ${cli.nome}</p>
-                <p style="margin: 0 0 12px 0; font-size: 16px; color: #A1A1AA;"><strong>Emissão:</strong> ${serv.dataStr} às ${serv.horaStr}</p>
-                <div style="height: 1px; background-color: rgba(255,255,255,0.1); margin: 20px 0;"></div>
-                <p style="margin: 0 0 12px 0; font-size: 17px;"><strong>Data de Coleta:</strong> ${formatarDataBR(serv.dataColeta)}</p>
-                <p style="margin: 0; font-size: 17px; color: #D4AF37;"><strong>Data de Entrega:</strong> ${formatarDataBR(serv.dataEntrega)}</p>
+            
+            <!-- Info do Cliente e Datas (Estilo glass-panel) -->
+            <div style="background-color: #141414; border: 1px solid rgba(212, 175, 55, 0.2); padding: 20px; border-radius: 16px; margin-bottom: 30px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+                    <strong style="color: #A1A1AA;">Cliente:</strong>
+                    <span style="color: #FFFFFF;">${cli.nome}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+                    <strong style="color: #A1A1AA;">Telefone:</strong>
+                    <span style="color: #FFFFFF;">${telefoneCli}</span>
+                </div>
+                
+                <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 12px 0;"></div>
+                
+                <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 14px;">
+                    <strong style="color: #A1A1AA;">Coleta:</strong>
+                    <span style="color: #FFFFFF;">${formatarDataBR(serv.dataColeta)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 14px;">
+                    <strong style="color: #D4AF37;">Entrega:</strong>
+                    <span style="font-weight: bold; color: #D4AF37;">${formatarDataBR(serv.dataEntrega)}</span>
+                </div>
             </div>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 35px; font-size: 17px;">
-                <thead>
-                    <tr>
-                        <th style="color: #D4AF37; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.2); padding: 15px 10px;">QTD</th>
-                        <th style="color: #D4AF37; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.2); padding: 15px 10px;">DESCRIÇÃO</th>
-                        <th style="color: #D4AF37; text-align: right; border-bottom: 2px solid rgba(255,255,255,0.2); padding: 15px 10px;">TOTAL</th>
-                    </tr>
-                </thead>
-                <tbody>${itensHtml}</tbody>
-            </table>
-            <div style="text-align: right; font-size: 22px; border-top: 1px dashed rgba(212,175,55,0.5); padding-top: 30px;">
-                TOTAL: <strong style="color: #D4AF37; font-size: 32px; margin-left: 10px;">${formatarMoeda(serv.total)}</strong>
+            
+            <!-- Itens -->
+            <div style="background-color: #141414; padding: 20px; border-radius: 16px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 15px; color: #D4AF37; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; font-size: 12px; text-transform: uppercase;">
+                    <span style="width: 40px;">Qtd</span>
+                    <span style="flex-grow: 1; text-align: left;">Descrição</span>
+                    <span>Total</span>
+                </div>
+                ${itensHtml}
             </div>
-        </div>`;
+            
+            <!-- Total -->
+            <div style="text-align: right; font-size: 24px; font-weight: 800; margin-top: 30px; color: #FFFFFF;">
+                TOTAL: <span style="color: #D4AF37;">${formatarMoeda(serv.total)}</span>
+            </div>
+        </div>
+    `;
+}
+
+function prepararEObterElemento(serv, cli) {
+    const container = document.getElementById('pdf-container');
+    container.innerHTML = montarLayoutRecibo(serv, cli);
+    
+    container.style.display = 'block';
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.zIndex = '-9999';
+    container.style.backgroundColor = '#050505'; // Fundo ajustado para a renderização
+    
+    return document.getElementById('pdf-content-wrapper');
+}
+
+function limparContainerPDF() {
+    const container = document.getElementById('pdf-container');
+    container.style.display = 'none';
+    container.innerHTML = '';
+}
+
+function obterOpcoesPDF(serv, cli) {
+    return {
+        margin:       0, // Margem zerada para o fundo cobrir a página inteira
+        filename:     `Recibo_OS${serv.osNumero}_${cli.nome.replace(/\s+/g, '_')}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#050505' }, // Cor de fundo sincronizada
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
 }
 
 function gerarReciboPDF(serv, cli) {
-    const container = document.getElementById('pdf-container');
-    container.style.display = 'block'; 
-    container.innerHTML = montarLayoutRecibo(serv, cli);
-    const element = document.getElementById('pdf-content-wrapper');
+    const element = prepararEObterElemento(serv, cli);
+    const opt = obterOpcoesPDF(serv, cli);
     
-    const opt = {
-        margin:       0,
-        filename:     `Recibo_Gold_Afiacoes_OS${serv.osNumero}_${cli.nome.replace(/\s+/g, '_')}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#050505', windowWidth: 800 },
-        jsPDF:        { unit: 'px', format: [800, 1131], orientation: 'portrait' }
-    };
-
     html2pdf().set(opt).from(element).save().then(() => {
-        container.style.display = 'none';
-        container.innerHTML = '';
+        limparContainerPDF();
+    }).catch(err => {
+        console.error("Erro no PDF:", err);
+        limparContainerPDF();
     });
 }
 
 function compartilharReciboWA(serv, cli) {
-    let numeroLimpo = cli.telefone ? cli.telefone.replace(/\D/g, '') : '';
-    if (numeroLimpo.length === 10 || numeroLimpo.length === 11) { numeroLimpo = '55' + numeroLimpo; }
-    let texto = `*GOLD AFIAÇÕES* ✂️✨\nOlá *${cli.nome}*, seu serviço foi agendado!\n\n*OS:* #${serv.osNumero}\n*Coleta:* ${formatarDataBR(serv.dataColeta)}\n*Entrega:* ${formatarDataBR(serv.dataEntrega)}\n\n*Detalhes do Serviço:*\n`;
-    serv.itens.forEach(item => { texto += `- ${item.qtdValor}x ${item.nome}: ${formatarMoeda(item.valorTotal)}\n`; });
-    texto += `\n*TOTAL: ${formatarMoeda(serv.total)}* 💵\n\nAgradecemos a preferência! Dúvidas? É só responder essa mensagem.`;
-    const textoEncoded = encodeURIComponent(texto);
-    if (numeroLimpo) { window.open(`https://wa.me/${numeroLimpo}?text=${textoEncoded}`, '_blank');
-    } else { window.open(`https://api.whatsapp.com/send?text=${textoEncoded}`, '_blank'); }
+    const element = prepararEObterElemento(serv, cli);
+    const opt = obterOpcoesPDF(serv, cli);
+
+    html2pdf().set(opt).from(element).toPdf().get('pdf').then(function(pdf) {
+        const pdfBlob = pdf.output('blob');
+        const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
+        
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({
+                files: [file],
+                title: `Recibo OS #${serv.osNumero}`,
+                text: `Olá ${cli.nome}, segue em anexo o recibo do seu serviço na Gold Afiações (OS #${serv.osNumero}).`
+            }).then(() => {
+                limparContainerPDF();
+            }).catch(err => {
+                console.log('Compartilhamento cancelado:', err);
+                limparContainerPDF();
+            });
+        } else {
+            alert("Seu dispositivo não suporta o envio automático de arquivos pelo WhatsApp.\\nO arquivo será baixado e abriremos a conversa para você anexá-lo manualmente.");
+            
+            pdf.save(opt.filename);
+            limparContainerPDF();
+            
+            let numeroLimpo = cli.telefone ? cli.telefone.replace(/\D/g, '') : '';
+            if (numeroLimpo.length === 10 || numeroLimpo.length === 11) { numeroLimpo = '55' + numeroLimpo; }
+            const texto = encodeURIComponent(`*GOLD AFIAÇÕES* ✂️✨\\nOlá *${cli.nome}*, estou lhe enviando o arquivo PDF do recibo do seu serviço (*OS #${serv.osNumero}*).`);
+            
+            setTimeout(() => {
+                if (numeroLimpo) { 
+                    window.open(`https://wa.me/${numeroLimpo}?text=${texto}`, '_blank');
+                } else { 
+                    window.open(`https://api.whatsapp.com/send?text=${texto}`, '_blank'); 
+                }
+            }, 1000);
+        }
+    });
 }
+// ==========================================
+
 
 // --- AGENDAMENTOS ---
 function renderizarAgendamentos(termoBusca = '') {
@@ -489,36 +526,33 @@ function renderizarAgendamentos(termoBusca = '') {
 function filtrarAgendamentos() { renderizarAgendamentos(document.getElementById('busca-agendamento').value); }
 
 function confirmarAgendamento(id) {
-    customConfirm("Confirmar Entrega?", "O serviço será marcado como concluído e sairá da agenda.", () => {
-        const index = servicos.findIndex(s => s.id === id);
-        if(index !== -1) {
-            servicos[index].concluido = true;
-            localStorage.setItem('gold_servicos_v2', JSON.stringify(servicos));
-            let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
-            if(!ocultos.includes(servicos[index].clienteId)) { ocultos.push(servicos[index].clienteId); localStorage.setItem('gold_ocultas_v2', JSON.stringify(ocultos)); }
-            renderizarAgendamentos(document.getElementById('busca-agendamento').value);
-            atualizarSinoNotificacoes(); popularSelectMesesFaturamento();
-        }
+    customConfirm("Confirmar Entrega?", "O serviço será marcado como concluído e sairá da agenda.", async () => {
+        const servico = servicos.find(s => s.id === id);
+        
+        await supabaseClient.from('servicos').update({ concluido: true }).eq('id', id);
+        await supabaseClient.from('clientes').update({ oculto: true }).eq('id', servico.clienteId);
+        
+        await carregarDadosDoSupabase();
+        renderizarAgendamentos(document.getElementById('busca-agendamento').value);
+        atualizarSinoNotificacoes(); popularSelectMesesFaturamento();
     });
 }
 
 function excluirAgendamento(id) {
-    customConfirm("Excluir OS da Agenda?", "A ordem de serviço será apagada do histórico e agenda.", () => {
-        const serv = servicos.find(s => s.id === id);
-        if(serv) {
-            const clienteId = serv.clienteId;
-            servicos = servicos.filter(s => s.id !== id);
-            localStorage.setItem('gold_servicos_v2', JSON.stringify(servicos));
-            let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
-            if(!ocultos.includes(clienteId)) { ocultos.push(clienteId); localStorage.setItem('gold_ocultas_v2', JSON.stringify(ocultos)); }
-            renderizarAgendamentos(document.getElementById('busca-agendamento').value);
-            renderizarHistorico(); atualizarSinoNotificacoes(); popularSelectMesesFaturamento();
-        }
+    customConfirm("Excluir OS da Agenda?", "A ordem de serviço será apagada do histórico.", async () => {
+        const servico = servicos.find(s => s.id === id);
+        
+        await supabaseClient.from('servicos').delete().eq('id', id);
+        await supabaseClient.from('clientes').update({ oculto: true }).eq('id', servico.clienteId);
+        
+        await carregarDadosDoSupabase();
+        renderizarAgendamentos(document.getElementById('busca-agendamento').value);
+        renderizarHistorico(); atualizarSinoNotificacoes(); popularSelectMesesFaturamento();
     });
 }
 
 // --- CLIENTES CRUD ---
-function salvarNovoCliente() {
+async function salvarNovoCliente() {
     const nome = document.getElementById('cli-nome').value.trim();
     const telefone = document.getElementById('cli-telefone').value.trim();
     const endereco = document.getElementById('cli-endereco').value.trim();
@@ -526,8 +560,7 @@ function salvarNovoCliente() {
 
     if (!nome) { alert("⚠️ O nome do cliente é obrigatório."); return; }
 
-    clientes.push({ id: Date.now().toString(), nome, telefone, endereco, retornoDias: retorno, dataCadastro: new Date().toISOString() });
-    localStorage.setItem('gold_clientes_v2', JSON.stringify(clientes));
+    await supabaseClient.from('clientes').insert([{ nome, telefone, endereco, retorno_dias: retorno, oculto: false }]);
     
     document.getElementById('cli-nome').value = ''; document.getElementById('cli-telefone').value = '';
     document.getElementById('cli-endereco').value = ''; document.getElementById('cli-retorno').value = '30';
@@ -536,6 +569,7 @@ function salvarNovoCliente() {
     const icon = accordionContent.previousElementSibling.querySelector('.accordion-icon');
     accordionContent.classList.remove('open'); icon.classList.remove('open');
     
+    await carregarDadosDoSupabase();
     atualizarSelectClientes(); popularSelectCidades(); renderizarListaClientes(); atualizarSinoNotificacoes();
 }
 
@@ -550,12 +584,10 @@ function editarCliente(id) {
     document.getElementById('edit-cli-retorno').value = cli.retornoDias;
     
     const modal = document.getElementById('modal-editar');
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-    toggleBackgroundScale(true);
+    modal.classList.add('active'); document.body.style.overflow = 'hidden'; toggleBackgroundScale(true);
 }
 
-function salvarEdicaoCliente() {
+async function salvarEdicaoCliente() {
     const id = document.getElementById('edit-cli-id').value;
     const nome = document.getElementById('edit-cli-nome').value.trim();
     const telefone = document.getElementById('edit-cli-telefone').value.trim();
@@ -563,18 +595,18 @@ function salvarEdicaoCliente() {
     const retorno = parseInt(document.getElementById('edit-cli-retorno').value) || 30;
 
     if (!nome) { alert("⚠️ O nome do cliente é obrigatório."); return; }
-    const index = clientes.findIndex(c => c.id === id);
-    if (index !== -1) { clientes[index].nome = nome; clientes[index].telefone = telefone; clientes[index].endereco = endereco; clientes[index].retornoDias = retorno; }
-    localStorage.setItem('gold_clientes_v2', JSON.stringify(clientes));
+
+    await supabaseClient.from('clientes').update({ nome, telefone, endereco, retorno_dias: retorno }).eq('id', id);
     
+    await carregarDadosDoSupabase();
     atualizarSelectClientes(); popularSelectCidades(); renderizarListaClientes(); atualizarSinoNotificacoes();
     fecharModal('modal-editar');
 }
 
 function excluirCliente(id) {
-    customConfirm("Excluir Cliente?", "O cadastro deste cliente será removido. Tem certeza?", () => {
-        clientes = clientes.filter(c => c.id !== id);
-        localStorage.setItem('gold_clientes_v2', JSON.stringify(clientes));
+    customConfirm("Excluir Cliente?", "O cadastro deste cliente será removido. Tem certeza?", async () => {
+        await supabaseClient.from('clientes').delete().eq('id', id);
+        await carregarDadosDoSupabase();
         atualizarSelectClientes(); popularSelectCidades(); renderizarListaClientes(); atualizarSinoNotificacoes();
     });
 }
@@ -755,15 +787,23 @@ function abrirModalCliente(id) {
 }
 
 function obterStatusClientes() {
-    const agora = new Date().getTime(); let listaStatus = [];
-    clientes.forEach(cliente => { const servsCli = servicos.filter(s => s.clienteId === cliente.id); if (servsCli.length > 0) { const dataBase = Math.max(...servsCli.map(s => s.timestamp)); const vencimento = dataBase + (cliente.retornoDias * 24 * 60 * 60 * 1000); const diasRestantes = Math.ceil((vencimento - agora) / (1000 * 60 * 60 * 24)); listaStatus.push({ cliente, diasRestantes, vencimento }); } });
+    const agora = new Date().getTime(); 
+    let listaStatus = [];
+    clientes.forEach(cliente => { 
+        const servsCli = servicos.filter(s => s.clienteId === cliente.id); 
+        if (servsCli.length > 0) { 
+            const dataBase = Math.max(...servsCli.map(s => s.timestamp)); 
+            const vencimento = dataBase + (cliente.retornoDias * 24 * 60 * 60 * 1000); 
+            const diasRestantes = Math.ceil((vencimento - agora) / (1000 * 60 * 60 * 24)); 
+            listaStatus.push({ cliente, diasRestantes, vencimento }); 
+        } 
+    });
     return listaStatus;
 }
 
 function atualizarSinoNotificacoes() {
-    let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
     const status = obterStatusClientes();
-    const atrasados = status.filter(s => s.diasRestantes <= 5 && !ocultos.includes(s.cliente.id)).length;
+    const atrasados = status.filter(s => s.diasRestantes <= 5 && !s.cliente.oculto).length;
     const badge = document.getElementById('notificacao-badge');
     badge.innerText = atrasados; badge.style.display = atrasados > 0 ? 'flex' : 'none';
 }
@@ -775,22 +815,29 @@ function abrirTelaNotificacoes() {
     
     const listaHtml = document.getElementById('lista-tela-notificacoes'); listaHtml.innerHTML = '';
     let statusClientes = obterStatusClientes().sort((a, b) => a.diasRestantes - b.diasRestantes);
+    
     if (statusClientes.length === 0) { return listaHtml.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding: 30px;">Nenhum histórico de afiação.</p>'; }
 
-    const termoCidade = document.getElementById('filtro-cidade')?.value || ''; const termoStatus = document.getElementById('filtro-status')?.value || 'todos';
-    let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
+    const termoCidade = document.getElementById('filtro-cidade')?.value || ''; 
+    const termoStatus = document.getElementById('filtro-status')?.value || 'todos';
+    
     let contagemVisivel = 0;
 
     statusClientes.forEach((item, index) => {
-        if (ocultos.includes(item.cliente.id)) return; 
-        const cidadeCli = extrairCidade(item.cliente.endereco); if (termoCidade && cidadeCli !== termoCidade) return;
+        if (item.cliente.oculto) return; 
+        
+        const cidadeCli = extrairCidade(item.cliente.endereco); 
+        if (termoCidade && cidadeCli !== termoCidade) return;
+        
         let corClasse, corTexto, icon, textoDias;
 
         if (item.diasRestantes >= 16) { corClasse = 'status-longe'; corTexto = 'var(--success)'; icon = 'ph-check-circle'; textoDias = `Faltam ${item.diasRestantes} dias`; } 
         else if (item.diasRestantes >= 6 && item.diasRestantes <= 15) { corClasse = 'status-perto'; corTexto = 'var(--warning)'; icon = 'ph-warning'; textoDias = `Faltam ${item.diasRestantes} dias`; } 
         else { corClasse = 'status-atrasado'; corTexto = 'var(--danger)'; icon = 'ph-warning-circle'; textoDias = item.diasRestantes <= 0 ? 'ATRASADO/HOJE' : `Faltam ${item.diasRestantes} dias`; }
 
-        if(termoStatus === 'longe' && item.diasRestantes < 16) return; if(termoStatus === 'perto' && (item.diasRestantes < 6 || item.diasRestantes > 15)) return; if(termoStatus === 'atrasado' && item.diasRestantes > 5) return;
+        if(termoStatus === 'longe' && item.diasRestantes < 16) return; 
+        if(termoStatus === 'perto' && (item.diasRestantes < 6 || item.diasRestantes > 15)) return; 
+        if(termoStatus === 'atrasado' && item.diasRestantes > 5) return;
         
         contagemVisivel++;
         listaHtml.innerHTML += `
@@ -816,9 +863,9 @@ function abrirTelaNotificacoes() {
 }
 
 function excluirNotificacao(id) {
-    customConfirm("Excluir Notificação?", "Aviso removido do painel até o próximo serviço do cliente.", () => {
-        let ocultos = JSON.parse(localStorage.getItem('gold_ocultas_v2')) || [];
-        ocultos.push(id); localStorage.setItem('gold_ocultas_v2', JSON.stringify(ocultos));
+    customConfirm("Excluir Notificação?", "Aviso removido do painel até o próximo serviço do cliente.", async () => {
+        await supabaseClient.from('clientes').update({ oculto: true }).eq('id', id);
+        await carregarDadosDoSupabase();
         abrirTelaNotificacoes(); atualizarSinoNotificacoes();
     });
 }
@@ -838,55 +885,43 @@ function fecharModalFora(event) {
     if (event.target.id === 'modal-confirm') fecharConfirm();
     if (event.target.id === 'modal-sucesso-os') fecharModalSucesso();
 }
-// BLOQUEAR BANNER NATIVO DE INSTALAÇÃO DO NAVEGADOR
+
 window.addEventListener('beforeinstallprompt', (e) => {
-    // Previne que o mini-banner apareça na parte inferior ou superior
     e.preventDefault();
 });
-// --- NAVEGAÇÃO POR ARRASTE (SWIPE) ENTRE AS ABAS ---
+
 let touchstartX = 0;
 let touchendX = 0;
-
-// Ordem das abas para navegação sequencial
 const abasOrdem = ['sec-servico', 'sec-agendamento', 'sec-clientes', 'sec-historico', 'sec-faturamento'];
 const botoesMenu = document.querySelectorAll('.nav-item');
 
 function processarArraste() {
-    const distanciaMinima = 60; // Distância mínima para validar o arraste
+    const distanciaMinima = 60; 
     const diferenca = touchstartX - touchendX;
     
-    if (Math.abs(diferenca) < distanciaMinima) return; // Ignora toques acidentais
+    if (Math.abs(diferenca) < distanciaMinima) return;
 
-    // Descobre em qual aba estamos no momento
     const indexAtual = abasOrdem.findIndex(id => document.getElementById(id).classList.contains('active'));
     if (indexAtual === -1) return;
 
     if (diferenca > 0) {
-        // Arrastou para a ESQUERDA (Avança uma aba)
         if (indexAtual < abasOrdem.length - 1) {
             mudarAba(abasOrdem[indexAtual + 1], botoesMenu[indexAtual + 1]);
         }
     } else {
-        // Arrastou para a DIREITA (Volta uma aba)
         if (indexAtual > 0) {
             mudarAba(abasOrdem[indexAtual - 1], botoesMenu[indexAtual - 1]);
         }
     }
 }
 
-// Escuta os toques na tela
 document.addEventListener('touchstart', e => {
     touchstartX = e.changedTouches[0].screenX;
 }, { passive: true });
 
 document.addEventListener('touchend', e => {
     touchendX = e.changedTouches[0].screenX;
-    
-    // Verifica se o usuário não está tentando fazer swipe em um card de cliente/OS
     const clicouNoCard = e.target.closest('.swipe-container') || e.target.closest('.modal-content');
     
-    // Só navega nas abas se estiver arrastando no fundo da tela principal
-    if (!clicouNoCard) {
-        processarArraste();
-    }
+    if (!clicouNoCard) { processarArraste(); }
 }, { passive: true });

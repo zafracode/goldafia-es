@@ -29,6 +29,9 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" defer></script>
     <!-- Biblioteca para gerar PDF (html2pdf) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+
+    <!-- Cliente Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -312,14 +315,16 @@
     <!-- Arquivo JS Externo (Adicionado defer) -->
     <script src="script.js" defer></script>
     
-    <!-- OTIMIZAÇÃO: Registro do Service Worker -->
+    <!-- OTIMIZAÇÃO: Registro do Service Worker apenas em servidores válidos -->
     <script>
-        if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js')
                     .then(reg => console.log('Service Worker registrado com sucesso:', reg.scope))
                     .catch(err => console.error('Erro ao registrar Service Worker:', err));
             });
+        } else if (window.location.protocol === 'file:') {
+            console.log('Service Worker ignorado: rodando arquivo localmente (file://)');
         }
     </script>
 </body>
