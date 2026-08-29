@@ -838,3 +838,55 @@ function fecharModalFora(event) {
     if (event.target.id === 'modal-confirm') fecharConfirm();
     if (event.target.id === 'modal-sucesso-os') fecharModalSucesso();
 }
+// BLOQUEAR BANNER NATIVO DE INSTALAÇÃO DO NAVEGADOR
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Previne que o mini-banner apareça na parte inferior ou superior
+    e.preventDefault();
+});
+// --- NAVEGAÇÃO POR ARRASTE (SWIPE) ENTRE AS ABAS ---
+let touchstartX = 0;
+let touchendX = 0;
+
+// Ordem das abas para navegação sequencial
+const abasOrdem = ['sec-servico', 'sec-agendamento', 'sec-clientes', 'sec-historico', 'sec-faturamento'];
+const botoesMenu = document.querySelectorAll('.nav-item');
+
+function processarArraste() {
+    const distanciaMinima = 60; // Distância mínima para validar o arraste
+    const diferenca = touchstartX - touchendX;
+    
+    if (Math.abs(diferenca) < distanciaMinima) return; // Ignora toques acidentais
+
+    // Descobre em qual aba estamos no momento
+    const indexAtual = abasOrdem.findIndex(id => document.getElementById(id).classList.contains('active'));
+    if (indexAtual === -1) return;
+
+    if (diferenca > 0) {
+        // Arrastou para a ESQUERDA (Avança uma aba)
+        if (indexAtual < abasOrdem.length - 1) {
+            mudarAba(abasOrdem[indexAtual + 1], botoesMenu[indexAtual + 1]);
+        }
+    } else {
+        // Arrastou para a DIREITA (Volta uma aba)
+        if (indexAtual > 0) {
+            mudarAba(abasOrdem[indexAtual - 1], botoesMenu[indexAtual - 1]);
+        }
+    }
+}
+
+// Escuta os toques na tela
+document.addEventListener('touchstart', e => {
+    touchstartX = e.changedTouches[0].screenX;
+}, { passive: true });
+
+document.addEventListener('touchend', e => {
+    touchendX = e.changedTouches[0].screenX;
+    
+    // Verifica se o usuário não está tentando fazer swipe em um card de cliente/OS
+    const clicouNoCard = e.target.closest('.swipe-container') || e.target.closest('.modal-content');
+    
+    // Só navega nas abas se estiver arrastando no fundo da tela principal
+    if (!clicouNoCard) {
+        processarArraste();
+    }
+}, { passive: true });
