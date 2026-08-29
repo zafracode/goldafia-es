@@ -78,7 +78,7 @@ header {
     position: sticky; top: 0; z-index: 100;
     padding: calc(20px + env(safe-area-inset-top)) 24px 20px;
     display: flex; justify-content: space-between; align-items: center;
-    background: rgba(5, 5, 5, 0.8);
+    background: #000000;
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border-bottom: 1px solid rgba(255,255,255,0.05);
@@ -360,3 +360,16 @@ nav {
 }
 .btn-localizacao:hover { background: rgba(59, 130, 246, 0.25); transform: translateY(-2px); }
 .btn-localizacao:active { transform: scale(0.97); }
+body {
+    background-color: var(--bg-base);
+    background-image: 
+        radial-gradient(circle at 15% 50%, rgba(212, 175, 55, 0.05), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(212, 175, 55, 0.08), transparent 25%);
+    background-attachment: fixed;
+    color: var(--text-main);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: calc(100px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    /* Adicione a linha abaixo: */
+    min-height: 100dvh; 
+}
