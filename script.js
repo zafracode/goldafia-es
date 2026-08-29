@@ -350,11 +350,10 @@ function montarLayoutRecibo(serv, cli) {
         `;
     });
     
-    // Tratamento para garantir que o telefone não exiba "undefined"
     const telefoneCli = cli.telefone ? cli.telefone : '-';
     
     return `
-        <div id="pdf-content-wrapper" style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; padding: 40px; background-color: #050505; color: #FFFFFF; width: 100%; min-height: 297mm; box-sizing: border-box;">
+        <div id="pdf-content-wrapper" style="position: relative; font-family: 'Plus Jakarta Sans', Arial, sans-serif; padding: 40px; background-color: #050505; color: #FFFFFF; width: 100%; min-height: 296.8mm; max-height: 298mm; overflow: hidden; box-sizing: border-box;">
             
             <!-- Cabeçalho -->
             <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px dashed rgba(255,255,255,0.1);">
@@ -363,7 +362,7 @@ function montarLayoutRecibo(serv, cli) {
                 <p style="color: #A1A1AA; font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 2px;">Recibo de Serviço</p>
             </div>
             
-            <!-- Info do Cliente e Datas (Estilo glass-panel) -->
+            <!-- Info do Cliente e Datas -->
             <div style="background-color: #141414; border: 1px solid rgba(212, 175, 55, 0.2); padding: 20px; border-radius: 16px; margin-bottom: 30px;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
                     <strong style="color: #A1A1AA;">Cliente:</strong>
@@ -400,6 +399,9 @@ function montarLayoutRecibo(serv, cli) {
             <div style="text-align: right; font-size: 24px; font-weight: 800; margin-top: 30px; color: #FFFFFF;">
                 TOTAL: <span style="color: #D4AF37;">${formatarMoeda(serv.total)}</span>
             </div>
+
+            <!-- Barra preta adicionada para ocultar a linha branca residual no final da página -->
+            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 25px; background-color: #050505; z-index: 9999;"></div>
         </div>
     `;
 }
@@ -409,7 +411,7 @@ function prepararEObterElemento(serv, cli) {
     container.innerHTML = montarLayoutRecibo(serv, cli);
     
     container.style.display = 'block';
-    container.style.position = 'fixed';
+    container.style.position = 'absolute'; 
     container.style.top = '0';
     container.style.left = '0';
     container.style.zIndex = '-9999';
@@ -429,7 +431,7 @@ function obterOpcoesPDF(serv, cli) {
         margin:       0, // Margem zerada para o fundo cobrir a página inteira
         filename:     `Recibo_OS${serv.osNumero}_${cli.nome.replace(/\s+/g, '_')}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#050505' }, // Cor de fundo sincronizada
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#050505', scrollY: 0 }, // Cor de fundo sincronizada
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 }
