@@ -39,7 +39,7 @@ async function carregarDadosDoSupabase() {
     const { data: dbClientes } = await supabaseClient.from('clientes').select('*');
     if (dbClientes) {
         clientes = dbClientes.map(c => ({
-            id: c.id, nome: c.nome, telefone: c.telefone, endereco: c.endereco, retornoDias: c.retorno_dias, oculto: c.oculto
+            id: c.id, nome: c.nome, telefone: c.telefone, endereco: c.endereco, cidade: c.cidade, retornoDias: c.retorno_dias, oculto: c.oculto
         }));
     }
 
@@ -102,20 +102,12 @@ const maskPhone = (input) => {
     input.value = val;
 };
 
-function extrairCidade(endereco) {
-    if (!endereco) return '';
-    let enderecoLimpo = endereco.replace(/,\s*$/, '').trim();
-    const partes = enderecoLimpo.split(',').map(p => p.trim()).filter(p => p !== '');
-    if (partes.length === 0) return '';
-    return partes.length >= 4 ? partes[3] : partes[partes.length - 1];
-}
-
 function popularSelectCidades() {
     const select = document.getElementById('filtro-cidade');
     if(!select) return;
     const cidadeAtual = select.value;
     let cidades = new Set();
-    clientes.forEach(c => { let cid = extrairCidade(c.endereco); if (cid) cidades.add(cid); });
+    clientes.forEach(c => { if (c.cidade && c.cidade.trim() !== '') cidades.add(c.cidade.trim()); });
     let html = '<option value="" style="background: #111;">Todas as cidades</option>';
     Array.from(cidades).sort().forEach(cid => { html += `<option value="${cid}" style="background: #111;">${cid}</option>`; });
     select.innerHTML = html;
@@ -558,14 +550,15 @@ async function salvarNovoCliente() {
     const nome = document.getElementById('cli-nome').value.trim();
     const telefone = document.getElementById('cli-telefone').value.trim();
     const endereco = document.getElementById('cli-endereco').value.trim();
+    const cidade = document.getElementById('cli-cidade').value.trim();
     const retorno = parseInt(document.getElementById('cli-retorno').value) || 30;
 
     if (!nome) { alert("⚠️ O nome do cliente é obrigatório."); return; }
 
-    await supabaseClient.from('clientes').insert([{ nome, telefone, endereco, retorno_dias: retorno, oculto: false }]);
+    await supabaseClient.from('clientes').insert([{ nome, telefone, endereco, cidade, retorno_dias: retorno, oculto: false }]);
     
     document.getElementById('cli-nome').value = ''; document.getElementById('cli-telefone').value = '';
-    document.getElementById('cli-endereco').value = ''; document.getElementById('cli-retorno').value = '30';
+    document.getElementById('cli-endereco').value = ''; document.getElementById('cli-cidade').value = ''; document.getElementById('cli-retorno').value = '30';
     
     const accordionContent = document.getElementById('acc-novo-cliente');
     const icon = accordionContent.previousElementSibling.querySelector('.accordion-icon');
@@ -583,6 +576,7 @@ function editarCliente(id) {
     document.getElementById('edit-cli-nome').value = cli.nome;
     document.getElementById('edit-cli-telefone').value = cli.telefone || '';
     document.getElementById('edit-cli-endereco').value = cli.endereco || '';
+    document.getElementById('edit-cli-cidade').value = cli.cidade || '';
     document.getElementById('edit-cli-retorno').value = cli.retornoDias;
     
     const modal = document.getElementById('modal-editar');
@@ -594,11 +588,12 @@ async function salvarEdicaoCliente() {
     const nome = document.getElementById('edit-cli-nome').value.trim();
     const telefone = document.getElementById('edit-cli-telefone').value.trim();
     const endereco = document.getElementById('edit-cli-endereco').value.trim();
+    const cidade = document.getElementById('edit-cli-cidade').value.trim();
     const retorno = parseInt(document.getElementById('edit-cli-retorno').value) || 30;
 
     if (!nome) { alert("⚠️ O nome do cliente é obrigatório."); return; }
 
-    await supabaseClient.from('clientes').update({ nome, telefone, endereco, retorno_dias: retorno }).eq('id', id);
+    await supabaseClient.from('clientes').update({ nome, telefone, endereco, cidade, retorno_dias: retorno }).eq('id', id);
     
     await carregarDadosDoSupabase();
     atualizarSelectClientes(); popularSelectCidades(); renderizarListaClientes(); atualizarSinoNotificacoes();
@@ -634,7 +629,7 @@ function renderizarListaClientes(termoBusca = '') {
                     <div class="cliente-nome">${cli.nome}</div>
                     <div style="height: 1px; background: rgba(255,255,255,0.05); margin: 5px 0;"></div>
                     <div class="cliente-info"><span><i class="ph ph-whatsapp-logo"></i> ${cli.telefone || '-'}</span> <span><i class="ph ph-arrows-clockwise"></i> <strong style="color:var(--gold)">${cli.retornoDias} dias</strong></span></div>
-                    <div class="cliente-info" style="margin-top: 5px;"><span><i class="ph ph-map-pin"></i> ${cli.endereco || 'Endereço não informado'}</span></div>
+                    <div class="cliente-info" style="margin-top: 5px;"><span><i class="ph ph-map-pin"></i> ${cli.endereco || 'Endereço não informado'}${cli.cidade ? ' - ' + cli.cidade : ''}</span></div>
                 </div>
                 <div class="swipe-actions" style="width: 140px;">
                     <button class="swipe-btn" style="background: var(--warning);" onclick="editarCliente('${cli.id}')"><i class="ph-bold ph-pencil" style="font-size: 1.4rem;"></i> Editar</button>
@@ -750,7 +745,11 @@ function abrirModalCliente(id) {
     if (numeroLimpo.length === 10 || numeroLimpo.length === 11) { numeroLimpo = '55' + numeroLimpo; }
     
     let btnWa = numeroLimpo ? `<a href="https://wa.me/${numeroLimpo}" target="_blank" class="btn-whatsapp"><i class="ph-fill ph-whatsapp-logo" style="font-size: 1.6rem;"></i> Chamar no WhatsApp</a>` : `<button class="btn" style="background: var(--bg-surface); color: var(--text-muted); margin-bottom: 12px;" disabled>Telefone não cadastrado</button>`;
-    let btnLocation = cli.endereco ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cli.endereco)}" target="_blank" class="btn-localizacao"><i class="ph-fill ph-map-pin" style="font-size: 1.4rem;"></i> Ver no Mapa</a>` : `<button class="btn-localizacao" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); cursor: not-allowed;" disabled>Endereço não cadastrado</button>`;
+    
+    let enderecoCompleto = cli.endereco ? cli.endereco : '';
+    if(cli.cidade) enderecoCompleto += enderecoCompleto ? ` - ${cli.cidade}` : cli.cidade;
+    
+    let btnLocation = enderecoCompleto ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoCompleto)}" target="_blank" class="btn-localizacao"><i class="ph-fill ph-map-pin" style="font-size: 1.4rem;"></i> Ver no Mapa</a>` : `<button class="btn-localizacao" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); cursor: not-allowed;" disabled>Endereço não cadastrado</button>`;
 
     let htmlHistorico = '<h4 style="color: var(--gold); margin-bottom: 16px; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;"><i class="ph-duotone ph-clock-counter-clockwise"></i> Histórico do Cliente</h4>';
     if (historicoCli.length === 0) { htmlHistorico += '<p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 20px; background: rgba(255,255,255,0.02); border-radius: 16px;">Nenhum serviço registrado.</p>'; } else {
@@ -775,7 +774,7 @@ function abrirModalCliente(id) {
     let html = `
         <div style="margin-bottom:24px; text-align:center;">
             <h2 style="justify-content: center; margin-bottom: 8px; font-size: 1.8rem; color: var(--text-main);">${cli.nome}</h2>
-            <p style="color: var(--text-muted); font-size: 0.95rem;">${cli.endereco || 'Endereço não informado'}</p>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">${enderecoCompleto || 'Endereço não informado'}</p>
             <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 5px;"><i class="ph-fill ph-arrows-clockwise" style="color: var(--gold);"></i> Ciclo: ${cli.retornoDias} dias</p>
         </div>
         ${btnWa}${btnLocation}${htmlHistorico}
@@ -828,7 +827,7 @@ function abrirTelaNotificacoes() {
     statusClientes.forEach((item, index) => {
         if (item.cliente.oculto) return; 
         
-        const cidadeCli = extrairCidade(item.cliente.endereco); 
+        const cidadeCli = item.cliente.cidade ? item.cliente.cidade.trim() : ''; 
         if (termoCidade && cidadeCli !== termoCidade) return;
         
         let corClasse, corTexto, icon, textoDias;
